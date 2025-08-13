@@ -1,0 +1,177 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Category {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  slug        String    @unique
+  description String?
+  image       String?
+  products    Product[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@map("categories")
+}
+
+model Brand {
+  id        String    @id @default(cuid())
+  name      String    @unique
+  slug      String    @unique
+  logo      String?
+  products  Product[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@map("brands")
+}
+
+model Product {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  description String?
+  price       Decimal  @db.Decimal(10, 2)
+  salePrice   Decimal? @db.Decimal(10, 2)
+  sku         String   @unique
+  stock       Int      @default(0)
+  isActive    Boolean  @default(true)
+  isFeatured  Boolean  @default(false)
+  
+  // Relations
+  categoryId  String
+  category    Category @relation(fields: [categoryId], references: [id])
+  brandId     String
+  brand       Brand    @relation(fields: [brandId], references: [id])
+  
+  // Product details
+  images      ProductImage[]
+  specifications ProductSpecification[]
+  cartItems   CartItem[]
+  orderItems  OrderItem[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("products")
+}
+
+model ProductImage {
+  id        String  @id @default(cuid())
+  url       String
+  alt       String?
+  isPrimary Boolean @default(false)
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@map("product_images")
+}
+
+model ProductSpecification {
+  id        String  @id @default(cuid())
+  name      String
+  value     String
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@map("product_specifications")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  firstName String
+  lastName  String
+  phone     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  cart      Cart?
+  orders    Order[]
+
+  @@map("users")
+}
+
+model Cart {
+  id     String     @id @default(cuid())
+  userId String     @unique
+  user   User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items  CartItem[]
+
+  @@map("carts")
+}
+
+model CartItem {
+  id        String  @id @default(cuid())
+  quantity  Int     @default(1)
+  cartId    String
+  cart      Cart    @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([cartId, productId])
+  @@map("cart_items")
+}
+
+model Order {
+  id            String      @id @default(cuid())
+  orderNumber   String      @unique
+  status        OrderStatus @default(PENDING)
+  totalAmount   Decimal     @db.Decimal(10, 2)
+  shippingCost  Decimal     @default(0) @db.Decimal(10, 2)
+  taxAmount     Decimal     @default(0) @db.Decimal(10, 2)
+  
+  // Customer info
+  userId        String
+  user          User        @relation(fields: [userId], references: [id])
+  
+  // Shipping address
+  shippingName     String
+  shippingEmail    String
+  shippingPhone    String?
+  shippingAddress1 String
+  shippingAddress2 String?
+  shippingCity     String
+  shippingState    String
+  shippingZip      String
+  shippingCountry  String
+  
+  // Relations
+  items         OrderItem[]
+  
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id        String  @id @default(cuid())
+  quantity  Int
+  price     Decimal @db.Decimal(10, 2)
+  orderId   String
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+
+  @@map("order_items")
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
