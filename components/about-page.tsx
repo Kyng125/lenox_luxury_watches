@@ -3,6 +3,7 @@
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Award, Clock, Shield, Users } from "lucide-react"
+import { Header } from "@/components/header"
 
 const stats = [
   { icon: Clock, label: "Years of Excellence", value: "50+" },
@@ -35,6 +36,8 @@ const team = [
 export function AboutPage() {
   return (
     <div className="min-h-screen bg-black text-white">
+      <Header />
+
       {/* Hero Section */}
       <section className="relative py-24 px-4">
         <div className="container mx-auto">

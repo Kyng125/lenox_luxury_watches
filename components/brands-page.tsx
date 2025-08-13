@@ -6,6 +6,7 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Search } from "lucide-react"
+import { Header } from "@/components/header"
 
 const brands = [
   {
@@ -75,6 +76,8 @@ export function BrandsPage() {
 
   return (
     <div className="min-h-screen bg-black text-white">
+      <Header />
+
       {/* Hero Section */}
       <section className="relative py-24 px-4">
         <div className="container mx-auto text-center">

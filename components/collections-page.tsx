@@ -3,6 +3,7 @@
 import Image from "next/image"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
+import { Header } from "@/components/header"
 
 const collections = [
   {
@@ -64,6 +65,8 @@ const collections = [
 export function CollectionsPage() {
   return (
     <div className="min-h-screen bg-black text-white">
+      <Header />
+
       {/* Hero Section */}
       <section className="relative py-24 px-4">
         <div className="container mx-auto text-center">

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { MapPin, Phone, Mail, Clock } from "lucide-react"
+import { Header } from "@/components/header"
 
 export function ContactPage() {
   const [formData, setFormData] = useState({
@@ -32,6 +33,8 @@ export function ContactPage() {
 
   return (
     <div className="min-h-screen bg-black text-white">
+      <Header />
+
       {/* Hero Section */}
       <section className="relative py-24 px-4">
         <div className="container mx-auto text-center">
