@@ -8,19 +8,13 @@ import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
 import { Minus, Plus, Trash2, ShoppingBag, ArrowLeft } from "lucide-react"
 import { useCart } from "@/contexts/cart-context"
+import { useCurrency } from "@/contexts/currency-context"
 import Link from "next/link"
 
 export function CartPage() {
   const { state, removeItem, updateQuantity, clearCart } = useCart()
+  const { formatPrice, convertPrice } = useCurrency()
   const [promoCode, setPromoCode] = useState("")
-
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-      minimumFractionDigits: 0,
-    }).format(price)
-  }
 
   const shipping = state.total > 1000 ? 0 : 50
   const tax = state.total * 0.08
@@ -107,13 +101,17 @@ export function CartPage() {
                       <div className="text-right">
                         {item.salePrice ? (
                           <div className="space-y-1">
-                            <p className="font-bold gold-gradient">{formatPrice(item.salePrice * item.quantity)}</p>
+                            <p className="font-bold gold-gradient">
+                              {formatPrice(convertPrice(item.salePrice * item.quantity))}
+                            </p>
                             <p className="text-sm text-muted-foreground line-through">
-                              {formatPrice(item.price * item.quantity)}
+                              {formatPrice(convertPrice(item.price * item.quantity))}
                             </p>
                           </div>
                         ) : (
-                          <p className="font-bold gold-gradient">{formatPrice(item.price * item.quantity)}</p>
+                          <p className="font-bold gold-gradient">
+                            {formatPrice(convertPrice(item.price * item.quantity))}
+                          </p>
                         )}
                       </div>
                     </div>
@@ -143,31 +141,31 @@ export function CartPage() {
             <CardContent className="space-y-4">
               <div className="flex justify-between">
                 <span>Subtotal</span>
-                <span className="font-medium">{formatPrice(state.total)}</span>
+                <span className="font-medium">{formatPrice(convertPrice(state.total))}</span>
               </div>
 
               <div className="flex justify-between">
                 <span>Shipping</span>
                 <span className="font-medium">
-                  {shipping === 0 ? <span className="text-green-400">Free</span> : formatPrice(shipping)}
+                  {shipping === 0 ? <span className="text-green-400">Free</span> : formatPrice(convertPrice(shipping))}
                 </span>
               </div>
 
               <div className="flex justify-between">
                 <span>Tax</span>
-                <span className="font-medium">{formatPrice(tax)}</span>
+                <span className="font-medium">{formatPrice(convertPrice(tax))}</span>
               </div>
 
               <Separator />
 
               <div className="flex justify-between text-lg font-bold">
                 <span>Total</span>
-                <span className="gold-gradient">{formatPrice(finalTotal)}</span>
+                <span className="gold-gradient">{formatPrice(convertPrice(finalTotal))}</span>
               </div>
 
               {state.total < 1000 && (
                 <p className="text-sm text-muted-foreground">
-                  Add {formatPrice(1000 - state.total)} more for free shipping
+                  Add {formatPrice(convertPrice(1000 - state.total))} more for free shipping
                 </p>
               )}
             </CardContent>

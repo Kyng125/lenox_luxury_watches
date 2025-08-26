@@ -9,6 +9,10 @@ import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { Search, Filter, Grid, List, Heart, ShoppingBag } from "lucide-react"
+import { ProductCardSkeleton, ProductListSkeleton } from "@/components/loading-skeleton"
+import { useWishlist } from "@/contexts/wishlist-context"
+import { useCart } from "@/contexts/cart-context"
+import { useCurrency } from "@/contexts/currency-context"
 import Link from "next/link"
 
 // Mock data - in a real app, this would come from your database
@@ -98,6 +102,9 @@ const priceRanges = [
 ]
 
 export function ProductCatalog() {
+  const { formatPrice, convertPrice } = useCurrency()
+  const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlist()
+  const { addItem } = useCart()
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedBrand, setSelectedBrand] = useState("All Brands")
   const [selectedCategory, setSelectedCategory] = useState("All Categories")
@@ -106,6 +113,7 @@ export function ProductCatalog() {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
   const [showFilters, setShowFilters] = useState(false)
   const [onlyInStock, setOnlyInStock] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
 
   const filteredAndSortedWatches = useMemo(() => {
     const filtered = watches.filter((watch) => {
@@ -141,12 +149,31 @@ export function ProductCatalog() {
     return filtered
   }, [searchQuery, selectedBrand, selectedCategory, selectedPriceRange, sortBy, onlyInStock])
 
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-      minimumFractionDigits: 0,
-    }).format(price)
+  const handleWishlistToggle = (watch: any) => {
+    if (isInWishlist(watch.id)) {
+      removeFromWishlist(watch.id)
+    } else {
+      addToWishlist({
+        id: watch.id,
+        name: watch.name,
+        brand: watch.brand,
+        price: watch.price,
+        salePrice: watch.salePrice,
+        image: watch.image,
+      })
+    }
+  }
+
+  const handleAddToCart = (watch: any) => {
+    addItem({
+      id: watch.id,
+      name: watch.name,
+      brand: watch.brand,
+      price: watch.price,
+      salePrice: watch.salePrice,
+      image: watch.image,
+      sku: `SKU-${watch.id}`,
+    })
   }
 
   return (
@@ -293,7 +320,21 @@ export function ProductCatalog() {
       </div>
 
       {/* Product Grid/List */}
-      {viewMode === "grid" ? (
+      {isLoading ? (
+        viewMode === "grid" ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {[...Array(8)].map((_, i) => (
+              <ProductCardSkeleton key={i} />
+            ))}
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {[...Array(4)].map((_, i) => (
+              <ProductListSkeleton key={i} />
+            ))}
+          </div>
+        )
+      ) : viewMode === "grid" ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {filteredAndSortedWatches.map((watch) => (
             <Card
@@ -317,8 +358,13 @@ export function ProductCatalog() {
                     </div>
                   )}
                   <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Button size="icon" variant="secondary" className="h-8 w-8">
-                      <Heart className="h-4 w-4" />
+                    <Button
+                      size="icon"
+                      variant={isInWishlist(watch.id) ? "default" : "secondary"}
+                      className="h-8 w-8"
+                      onClick={() => handleWishlistToggle(watch)}
+                    >
+                      <Heart className={`h-4 w-4 ${isInWishlist(watch.id) ? "fill-current" : ""}`} />
                     </Button>
                   </div>
                 </div>
@@ -332,11 +378,17 @@ export function ProductCatalog() {
                     <div className="flex items-center gap-2">
                       {watch.salePrice ? (
                         <>
-                          <span className="text-lg font-bold gold-gradient">{formatPrice(watch.salePrice)}</span>
-                          <span className="text-sm text-muted-foreground line-through">{formatPrice(watch.price)}</span>
+                          <span className="text-lg font-bold gold-gradient">
+                            {formatPrice(convertPrice(watch.salePrice))}
+                          </span>
+                          <span className="text-sm text-muted-foreground line-through">
+                            {formatPrice(convertPrice(watch.price))}
+                          </span>
                         </>
                       ) : (
-                        <span className="text-lg font-bold gold-gradient">{formatPrice(watch.price)}</span>
+                        <span className="text-lg font-bold gold-gradient">
+                          {formatPrice(convertPrice(watch.price))}
+                        </span>
                       )}
                     </div>
                     <div className="flex gap-2">
@@ -348,7 +400,12 @@ export function ProductCatalog() {
                       >
                         <Link href={`/watches/${watch.id}`}>View</Link>
                       </Button>
-                      <Button size="sm" disabled={watch.stock === 0} className="bg-primary hover:bg-primary/90">
+                      <Button
+                        size="sm"
+                        disabled={watch.stock === 0}
+                        className="bg-primary hover:bg-primary/90"
+                        onClick={() => handleAddToCart(watch)}
+                      >
                         <ShoppingBag className="h-4 w-4" />
                       </Button>
                     </div>
@@ -385,21 +442,30 @@ export function ProductCatalog() {
                       <div className="flex items-center gap-3">
                         {watch.salePrice ? (
                           <>
-                            <span className="text-2xl font-bold gold-gradient">{formatPrice(watch.salePrice)}</span>
+                            <span className="text-2xl font-bold gold-gradient">
+                              {formatPrice(convertPrice(watch.salePrice))}
+                            </span>
                             <span className="text-lg text-muted-foreground line-through">
-                              {formatPrice(watch.price)}
+                              {formatPrice(convertPrice(watch.price))}
                             </span>
                           </>
                         ) : (
-                          <span className="text-2xl font-bold gold-gradient">{formatPrice(watch.price)}</span>
+                          <span className="text-2xl font-bold gold-gradient">
+                            {formatPrice(convertPrice(watch.price))}
+                          </span>
                         )}
                         <Badge variant="outline" className="border-border">
                           {watch.stock > 0 ? `${watch.stock} in stock` : "Out of stock"}
                         </Badge>
                       </div>
                       <div className="flex gap-3">
-                        <Button variant="ghost" size="icon">
-                          <Heart className="h-4 w-4" />
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleWishlistToggle(watch)}
+                          className={isInWishlist(watch.id) ? "text-red-500" : ""}
+                        >
+                          <Heart className={`h-4 w-4 ${isInWishlist(watch.id) ? "fill-current" : ""}`} />
                         </Button>
                         <Button
                           asChild
@@ -408,7 +474,11 @@ export function ProductCatalog() {
                         >
                           <Link href={`/watches/${watch.id}`}>View Details</Link>
                         </Button>
-                        <Button disabled={watch.stock === 0} className="bg-primary hover:bg-primary/90">
+                        <Button
+                          disabled={watch.stock === 0}
+                          className="bg-primary hover:bg-primary/90"
+                          onClick={() => handleAddToCart(watch)}
+                        >
                           <ShoppingBag className="h-4 w-4 mr-2" />
                           Add to Cart
                         </Button>
@@ -422,7 +492,7 @@ export function ProductCatalog() {
         </div>
       )}
 
-      {filteredAndSortedWatches.length === 0 && (
+      {filteredAndSortedWatches.length === 0 && !isLoading && (
         <div className="text-center py-12">
           <p className="text-xl text-muted-foreground mb-4">No watches found matching your criteria</p>
           <Button

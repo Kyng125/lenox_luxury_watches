@@ -3,7 +3,7 @@
 import { useState, useCallback } from "react"
 import { useDropzone } from "react-dropzone"
 import { Button } from "@/components/ui/button"
-import { X, Upload, ImageIcon } from "lucide-react"
+import { X, Upload, ImageIcon, ArrowUp, ArrowDown } from "lucide-react"
 import Image from "next/image"
 
 interface ImageUploadProps {
@@ -63,9 +63,17 @@ export function ImageUpload({ images, onImagesChange, maxImages = 5, className =
           const fileId = Math.random().toString(36)
           setUploadProgress((prev) => ({ ...prev, [fileId]: 0 }))
 
+          const progressInterval = setInterval(() => {
+            setUploadProgress((prev) => ({
+              ...prev,
+              [fileId]: Math.min((prev[fileId] || 0) + 10, 90),
+            }))
+          }, 100)
+
           const result = await uploadImage(file)
           newImages.push(result.url)
 
+          clearInterval(progressInterval)
           setUploadProgress((prev) => ({ ...prev, [fileId]: 100 }))
         }
 
@@ -109,6 +117,18 @@ export function ImageUpload({ images, onImagesChange, maxImages = 5, className =
     onImagesChange(newImages)
   }
 
+  const moveImageUp = (index: number) => {
+    if (index > 0) {
+      moveImage(index, index - 1)
+    }
+  }
+
+  const moveImageDown = (index: number) => {
+    if (index < images.length - 1) {
+      moveImage(index, index + 1)
+    }
+  }
+
   return (
     <div className={`space-y-4 ${className}`}>
       {/* Upload Area */}
@@ -119,18 +139,18 @@ export function ImageUpload({ images, onImagesChange, maxImages = 5, className =
             border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors
             ${
               isDragActive
-                ? "border-yellow-500 bg-yellow-50"
-                : "border-gray-300 hover:border-yellow-500 hover:bg-gray-50"
+                ? "border-yellow-500 bg-yellow-50 dark:bg-yellow-950/20"
+                : "border-gray-300 hover:border-yellow-500 hover:bg-gray-50 dark:hover:bg-gray-900"
             }
             ${uploading ? "opacity-50 cursor-not-allowed" : ""}
           `}
         >
           <input {...getInputProps()} />
           <Upload className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-          <p className="text-lg font-medium text-gray-900 mb-2">
+          <p className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
             {isDragActive ? "Drop images here" : "Upload product images"}
           </p>
-          <p className="text-sm text-gray-500">Drag & drop images here, or click to select files</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400">Drag & drop images here, or click to select files</p>
           <p className="text-xs text-gray-400 mt-2">
             PNG, JPG, WEBP up to 5MB ({images.length}/{maxImages} images)
           </p>
@@ -141,7 +161,7 @@ export function ImageUpload({ images, onImagesChange, maxImages = 5, className =
       {Object.keys(uploadProgress).length > 0 && (
         <div className="space-y-2">
           {Object.entries(uploadProgress).map(([fileId, progress]) => (
-            <div key={fileId} className="bg-gray-200 rounded-full h-2">
+            <div key={fileId} className="bg-gray-200 dark:bg-gray-700 rounded-full h-2">
               <div
                 className="bg-yellow-500 h-2 rounded-full transition-all duration-300"
                 style={{ width: `${progress}%` }}
@@ -156,7 +176,7 @@ export function ImageUpload({ images, onImagesChange, maxImages = 5, className =
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {images.map((image, index) => (
             <div key={index} className="relative group">
-              <div className="aspect-square relative rounded-lg overflow-hidden bg-gray-100">
+              <div className="aspect-square relative rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-800">
                 <Image
                   src={image || "/placeholder.svg"}
                   alt={`Product image ${index + 1}`}
@@ -172,15 +192,31 @@ export function ImageUpload({ images, onImagesChange, maxImages = 5, className =
                 )}
 
                 {/* Actions */}
-                <div className="absolute inset-0 bg-black bg-opacity-50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center space-x-2">
-                  {index > 0 && (
-                    <Button size="sm" variant="secondary" onClick={() => moveImage(index, 0)} className="text-xs">
-                      Make Primary
-                    </Button>
-                  )}
-                  <Button size="sm" variant="destructive" onClick={() => removeImage(index)}>
-                    <X className="h-4 w-4" />
-                  </Button>
+                <div className="absolute inset-0 bg-black bg-opacity-50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                  <div className="flex flex-col gap-2">
+                    <div className="flex gap-2">
+                      {index > 0 && (
+                        <Button size="sm" variant="secondary" onClick={() => moveImage(index, 0)} className="text-xs">
+                          Primary
+                        </Button>
+                      )}
+                      <Button size="sm" variant="destructive" onClick={() => removeImage(index)}>
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <div className="flex gap-2">
+                      {index > 0 && (
+                        <Button size="sm" variant="outline" onClick={() => moveImageUp(index)}>
+                          <ArrowUp className="h-4 w-4" />
+                        </Button>
+                      )}
+                      {index < images.length - 1 && (
+                        <Button size="sm" variant="outline" onClick={() => moveImageDown(index)}>
+                          <ArrowDown className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -189,7 +225,7 @@ export function ImageUpload({ images, onImagesChange, maxImages = 5, className =
       )}
 
       {images.length === 0 && (
-        <div className="text-center py-8 text-gray-500">
+        <div className="text-center py-8 text-gray-500 dark:text-gray-400">
           <ImageIcon className="mx-auto h-12 w-12 mb-4" />
           <p>No images uploaded yet</p>
         </div>

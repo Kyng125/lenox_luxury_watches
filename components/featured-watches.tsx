@@ -5,7 +5,9 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import Link from "next/link"
 import { useCart } from "@/contexts/cart-context"
-import { ShoppingBag } from "lucide-react"
+import { useCurrency } from "@/contexts/currency-context"
+import { useWishlist } from "@/contexts/wishlist-context"
+import { ShoppingBag, Heart } from "lucide-react"
 
 const featuredWatches = [
   {
@@ -42,14 +44,8 @@ const featuredWatches = [
 
 export function FeaturedWatches() {
   const { addItem } = useCart()
-
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-      minimumFractionDigits: 0,
-    }).format(price)
-  }
+  const { formatPrice, convertPrice } = useCurrency()
+  const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlist()
 
   const handleAddToCart = (watch: (typeof featuredWatches)[0]) => {
     addItem({
@@ -61,6 +57,21 @@ export function FeaturedWatches() {
       image: watch.image,
       sku: watch.sku,
     })
+  }
+
+  const handleWishlistToggle = (watch: (typeof featuredWatches)[0]) => {
+    if (isInWishlist(watch.id)) {
+      removeFromWishlist(watch.id)
+    } else {
+      addToWishlist({
+        id: watch.id,
+        name: watch.name,
+        brand: watch.brand,
+        price: watch.price,
+        salePrice: watch.salePrice,
+        image: watch.image,
+      })
+    }
   }
 
   return (
@@ -89,6 +100,16 @@ export function FeaturedWatches() {
                     className="w-full h-80 object-cover group-hover:scale-105 transition-transform duration-500"
                   />
                   <Badge className="absolute top-4 left-4 bg-primary text-primary-foreground">{watch.badge}</Badge>
+                  <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Button
+                      size="icon"
+                      variant={isInWishlist(watch.id) ? "default" : "secondary"}
+                      className="h-8 w-8"
+                      onClick={() => handleWishlistToggle(watch)}
+                    >
+                      <Heart className={`h-4 w-4 ${isInWishlist(watch.id) ? "fill-current" : ""}`} />
+                    </Button>
+                  </div>
                 </div>
                 <div className="p-6">
                   <div className="mb-4">
@@ -96,7 +117,7 @@ export function FeaturedWatches() {
                     <h3 className="font-serif text-xl font-semibold">{watch.name}</h3>
                   </div>
                   <div className="flex items-center justify-between mb-4">
-                    <span className="text-2xl font-bold gold-gradient">{formatPrice(watch.price)}</span>
+                    <span className="text-2xl font-bold gold-gradient">{formatPrice(convertPrice(watch.price))}</span>
                   </div>
                   <div className="flex gap-2">
                     <Button

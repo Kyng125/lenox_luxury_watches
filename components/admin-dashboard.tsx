@@ -3,8 +3,9 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Package, Users, ShoppingCart, DollarSign, TrendingUp, AlertCircle, Plus } from "lucide-react"
+import { Package, Users, ShoppingCart, DollarSign, TrendingUp, AlertCircle, Plus, Eye } from "lucide-react"
 import Link from "next/link"
+import { useCurrency } from "@/contexts/currency-context"
 
 // Mock data - in production, this would come from your database
 const dashboardStats = {
@@ -28,13 +29,7 @@ const dashboardStats = {
 }
 
 export function AdminDashboard() {
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-      minimumFractionDigits: 0,
-    }).format(amount)
-  }
+  const { formatPrice, convertPrice } = useCurrency()
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("en-US", {
@@ -53,6 +48,12 @@ export function AdminDashboard() {
           <p className="text-muted-foreground">Manage your luxury watch inventory and orders</p>
         </div>
         <div className="flex gap-3">
+          <Button asChild variant="outline" className="border-primary text-primary bg-transparent">
+            <Link href="/admin/analytics">
+              <Eye className="h-4 w-4 mr-2" />
+              View Analytics
+            </Link>
+          </Button>
           <Button asChild className="bg-primary hover:bg-primary/90">
             <Link href="/admin/products/new">
               <Plus className="h-4 w-4 mr-2" />
@@ -96,7 +97,7 @@ export function AdminDashboard() {
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(dashboardStats.totalRevenue)}</div>
+            <div className="text-2xl font-bold">{formatPrice(convertPrice(dashboardStats.totalRevenue))}</div>
             <p className="text-xs text-green-500 flex items-center">
               <TrendingUp className="h-3 w-3 mr-1" />+{dashboardStats.monthlyGrowth}% from last month
             </p>
@@ -137,7 +138,7 @@ export function AdminDashboard() {
                   </div>
                   <div className="text-right">
                     <p className="font-semibold text-sm">{product.sales} sold</p>
-                    <p className="text-sm text-muted-foreground">{formatCurrency(product.revenue)}</p>
+                    <p className="text-sm text-muted-foreground">{formatPrice(convertPrice(product.revenue))}</p>
                   </div>
                 </div>
               ))}
@@ -160,7 +161,7 @@ export function AdminDashboard() {
                     <p className="text-sm text-muted-foreground">Order #{order.id}</p>
                   </div>
                   <div className="text-right">
-                    <p className="font-semibold text-sm">{formatCurrency(order.total)}</p>
+                    <p className="font-semibold text-sm">{formatPrice(convertPrice(order.total))}</p>
                     <div className="flex items-center gap-2">
                       <Badge
                         variant={
@@ -194,7 +195,7 @@ export function AdminDashboard() {
           <CardDescription>Common administrative tasks</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <Button asChild variant="outline" className="h-auto p-4 border-border bg-transparent">
               <Link href="/admin/products" className="flex flex-col items-center gap-2">
                 <Package className="h-6 w-6 text-primary" />
@@ -208,6 +209,14 @@ export function AdminDashboard() {
                 <ShoppingCart className="h-6 w-6 text-primary" />
                 <span className="font-semibold">View Orders</span>
                 <span className="text-xs text-muted-foreground">Process customer orders</span>
+              </Link>
+            </Button>
+
+            <Button asChild variant="outline" className="h-auto p-4 border-border bg-transparent">
+              <Link href="/admin/analytics" className="flex flex-col items-center gap-2">
+                <TrendingUp className="h-6 w-6 text-primary" />
+                <span className="font-semibold">Analytics</span>
+                <span className="text-xs text-muted-foreground">View business insights</span>
               </Link>
             </Button>
 

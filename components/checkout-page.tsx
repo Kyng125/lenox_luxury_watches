@@ -9,10 +9,11 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, CreditCard, Truck, Shield, Check } from "lucide-react"
+import { ArrowLeft, Truck, Shield, Check } from "lucide-react"
 import { useCart } from "@/contexts/cart-context"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { PaymentForm } from "./payment-form"
 
 interface CheckoutFormData {
   // Contact Information
@@ -93,6 +94,7 @@ export function CheckoutPage() {
   const [currentStep, setCurrentStep] = useState(1)
   const [formData, setFormData] = useState<CheckoutFormData>(initialFormData)
   const [isProcessing, setIsProcessing] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat("en-US", {
@@ -168,7 +170,7 @@ export function CheckoutPage() {
           formData.shippingZip
         )
       case 3:
-        return !!(formData.cardNumber && formData.expiryDate && formData.cvv && formData.cardName)
+        return true // Payment form will handle validation
       default:
         return false
     }
@@ -184,23 +186,72 @@ export function CheckoutPage() {
     setCurrentStep((prev) => Math.max(prev - 1, 1))
   }
 
-  const handleSubmitOrder = async () => {
-    if (!validateStep(3)) return
-
-    setIsProcessing(true)
-
+  const handlePaymentSuccess = async (paymentIntentId: string) => {
     try {
-      // Simulate order processing
-      await new Promise((resolve) => setTimeout(resolve, 2000))
+      // Create order with payment confirmation
+      const orderData = {
+        items: state.items,
+        billingAddress: {
+          firstName: formData.billingFirstName,
+          lastName: formData.billingLastName,
+          company: formData.billingCompany,
+          address1: formData.billingAddress1,
+          address2: formData.billingAddress2,
+          city: formData.billingCity,
+          state: formData.billingState,
+          zip: formData.billingZip,
+          country: formData.billingCountry,
+        },
+        shippingAddress: formData.sameAsShipping
+          ? null
+          : {
+              firstName: formData.shippingFirstName,
+              lastName: formData.shippingLastName,
+              company: formData.shippingCompany,
+              address1: formData.shippingAddress1,
+              address2: formData.shippingAddress2,
+              city: formData.shippingCity,
+              state: formData.shippingState,
+              zip: formData.shippingZip,
+              country: formData.shippingCountry,
+            },
+        paymentIntentId,
+        subtotal: state.total,
+        taxAmount: tax,
+        shippingAmount: shipping,
+        totalAmount: finalTotal,
+        guestEmail: formData.email,
+        createAccount: formData.createAccount,
+        accountData: formData.createAccount
+          ? {
+              email: formData.email,
+              password: formData.password,
+            }
+          : null,
+      }
 
-      // Clear cart and redirect to success page
-      clearCart()
-      router.push("/checkout/success")
+      const response = await fetch("/api/orders", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(orderData),
+      })
+
+      if (response.ok) {
+        clearCart()
+        router.push(`/checkout/success?payment_intent=${paymentIntentId}`)
+      } else {
+        throw new Error("Order creation failed")
+      }
     } catch (error) {
       console.error("Order processing failed:", error)
-    } finally {
-      setIsProcessing(false)
+      setError("Order processing failed. Please contact support.")
     }
+  }
+
+  const handlePaymentError = (error: string) => {
+    setError(error)
   }
 
   if (state.items.length === 0) {
@@ -586,96 +637,16 @@ export function CheckoutPage() {
                   <div className="space-y-6">
                     <h2 className="font-serif text-2xl font-bold mb-4 gold-gradient">Payment Information</h2>
 
-                    <div className="bg-gray-800 p-4 rounded-lg">
-                      <div className="flex items-center gap-3 mb-4">
-                        <CreditCard className="h-5 w-5 text-yellow-400" />
-                        <h3 className="font-semibold">Payment Method</h3>
-                      </div>
-
-                      <RadioGroup
-                        value={formData.paymentMethod}
-                        onValueChange={(value) => handleInputChange("paymentMethod", value)}
-                      >
-                        <div className="flex items-center space-x-2 p-3 border border-gray-700 rounded-lg">
-                          <RadioGroupItem value="credit-card" id="credit-card" />
-                          <Label htmlFor="credit-card" className="flex-1">
-                            <div className="flex items-center gap-2">
-                              <span>Credit Card</span>
-                              <div className="flex gap-1">
-                                <div className="w-8 h-5 bg-blue-600 rounded text-xs flex items-center justify-center text-white font-bold">
-                                  V
-                                </div>
-                                <div className="w-8 h-5 bg-red-600 rounded text-xs flex items-center justify-center text-white font-bold">
-                                  M
-                                </div>
-                                <div className="w-8 h-5 bg-blue-800 rounded text-xs flex items-center justify-center text-white font-bold">
-                                  A
-                                </div>
-                              </div>
-                            </div>
-                          </Label>
-                        </div>
-                      </RadioGroup>
-                    </div>
-
-                    {formData.paymentMethod === "credit-card" && (
-                      <div className="space-y-4">
-                        <div>
-                          <Label htmlFor="cardName">Name on Card *</Label>
-                          <Input
-                            id="cardName"
-                            value={formData.cardName}
-                            onChange={(e) => handleInputChange("cardName", e.target.value)}
-                            className="bg-gray-800 border-gray-700 text-white"
-                            placeholder="John Doe"
-                          />
-                        </div>
-
-                        <div>
-                          <Label htmlFor="cardNumber">Card Number *</Label>
-                          <Input
-                            id="cardNumber"
-                            value={formData.cardNumber}
-                            onChange={(e) => handleInputChange("cardNumber", e.target.value)}
-                            className="bg-gray-800 border-gray-700 text-white"
-                            placeholder="1234 5678 9012 3456"
-                          />
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <Label htmlFor="expiryDate">Expiry Date *</Label>
-                            <Input
-                              id="expiryDate"
-                              value={formData.expiryDate}
-                              onChange={(e) => handleInputChange("expiryDate", e.target.value)}
-                              className="bg-gray-800 border-gray-700 text-white"
-                              placeholder="MM/YY"
-                            />
-                          </div>
-                          <div>
-                            <Label htmlFor="cvv">CVV *</Label>
-                            <Input
-                              id="cvv"
-                              value={formData.cvv}
-                              onChange={(e) => handleInputChange("cvv", e.target.value)}
-                              className="bg-gray-800 border-gray-700 text-white"
-                              placeholder="123"
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="bg-gray-800 p-4 rounded-lg">
-                      <div className="flex items-center gap-3">
-                        <Shield className="h-5 w-5 text-green-400" />
-                        <div>
-                          <p className="font-medium">Secure Payment</p>
-                          <p className="text-sm text-gray-400">Your payment information is encrypted and secure</p>
-                        </div>
-                      </div>
-                    </div>
+                    <PaymentForm
+                      amount={finalTotal}
+                      currency="usd"
+                      onSuccess={handlePaymentSuccess}
+                      onError={handlePaymentError}
+                      metadata={{
+                        customerEmail: formData.email,
+                        orderType: "luxury-watch-purchase",
+                      }}
+                    />
                   </div>
                 )}
 
@@ -762,7 +733,7 @@ export function CheckoutPage() {
                       </Button>
                     ) : (
                       <Button
-                        onClick={handleSubmitOrder}
+                        onClick={() => {}}
                         disabled={isProcessing}
                         className="bg-gradient-to-r from-yellow-600 to-yellow-500 hover:from-yellow-500 hover:to-yellow-400 text-black font-semibold"
                       >
