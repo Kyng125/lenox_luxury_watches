@@ -6,6 +6,8 @@ export const metadata: Metadata = {
   description: "Complete your luxury watch purchase with our secure checkout process.",
 }
 
+export const dynamic = "force-dynamic"
+
 export default function Checkout() {
   return <CheckoutPage />
 }
