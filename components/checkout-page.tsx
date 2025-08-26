@@ -11,6 +11,7 @@ import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
 import { ArrowLeft, Truck, Shield, Check } from "lucide-react"
 import { useCart } from "@/contexts/cart-context"
+import { useCurrency } from "@/contexts/currency-context"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { PaymentForm } from "./payment-form"
@@ -90,19 +91,12 @@ const initialFormData: CheckoutFormData = {
 
 export function CheckoutPage() {
   const { state, clearCart } = useCart()
+  const { formatPrice } = useCurrency()
   const router = useRouter()
   const [currentStep, setCurrentStep] = useState(1)
   const [formData, setFormData] = useState<CheckoutFormData>(initialFormData)
   const [isProcessing, setIsProcessing] = useState(false)
   const [error, setError] = useState<string | null>(null)
-
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-      minimumFractionDigits: 0,
-    }).format(price)
-  }
 
   const shipping = state.total > 1000 ? 0 : 50
   const tax = state.total * 0.08
@@ -186,7 +180,7 @@ export function CheckoutPage() {
     setCurrentStep((prev) => Math.max(prev - 1, 1))
   }
 
-  const handlePaymentSuccess = async (paymentIntentId: string) => {
+  const handlePaymentSuccess = async (reference: string) => {
     try {
       // Create order with payment confirmation
       const orderData = {
@@ -215,7 +209,7 @@ export function CheckoutPage() {
               zip: formData.shippingZip,
               country: formData.shippingCountry,
             },
-        paymentIntentId,
+        paymentReference: reference,
         subtotal: state.total,
         taxAmount: tax,
         shippingAmount: shipping,
@@ -240,7 +234,7 @@ export function CheckoutPage() {
 
       if (response.ok) {
         clearCart()
-        router.push(`/checkout/success?payment_intent=${paymentIntentId}`)
+        router.push(`/checkout/success?reference=${reference}`)
       } else {
         throw new Error("Order creation failed")
       }
@@ -611,7 +605,7 @@ export function CheckoutPage() {
                                 <p className="font-medium">Express Shipping</p>
                                 <p className="text-sm text-gray-400">2-3 business days</p>
                               </div>
-                              <p className="font-medium">$25.00</p>
+                              <p className="font-medium">{formatPrice(25)}</p>
                             </div>
                           </Label>
                         </div>
@@ -623,7 +617,7 @@ export function CheckoutPage() {
                                 <p className="font-medium">Overnight Shipping</p>
                                 <p className="text-sm text-gray-400">Next business day</p>
                               </div>
-                              <p className="font-medium">$50.00</p>
+                              <p className="font-medium">{formatPrice(50)}</p>
                             </div>
                           </Label>
                         </div>
@@ -639,13 +633,16 @@ export function CheckoutPage() {
 
                     <PaymentForm
                       amount={finalTotal}
-                      currency="usd"
+                      currency="NGN"
                       onSuccess={handlePaymentSuccess}
                       onError={handlePaymentError}
                       metadata={{
                         customerEmail: formData.email,
                         orderType: "luxury-watch-purchase",
                       }}
+                      customerEmail={formData.email}
+                      customerName={`${formData.billingFirstName} ${formData.billingLastName}`}
+                      customerPhone={formData.phone}
                     />
                   </div>
                 )}
