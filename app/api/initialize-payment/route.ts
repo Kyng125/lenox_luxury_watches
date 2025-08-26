@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { paystack, formatAmountForPaystack } from "@/lib/paystack"
+import { getPaystackClient, formatAmountForPaystack } from "@/lib/paystack"
 import { createClient } from "@/lib/supabase/server"
 
 export async function POST(request: NextRequest) {
@@ -13,6 +13,8 @@ export async function POST(request: NextRequest) {
     if (!email) {
       return NextResponse.json({ error: "Email is required" }, { status: 400 })
     }
+
+    const paystack = getPaystackClient()
 
     // Initialize payment with Paystack
     const response = await paystack.transaction.initialize({

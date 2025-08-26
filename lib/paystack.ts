@@ -1,10 +1,12 @@
 import { Paystack } from "paystack"
 
-if (!process.env.PAYSTACK_SECRET_KEY) {
-  throw new Error("PAYSTACK_SECRET_KEY is not set")
+// Function to create Paystack instance only when needed
+export const getPaystackClient = (): Paystack => {
+  if (!process.env.PAYSTACK_SECRET_KEY) {
+    throw new Error("PAYSTACK_SECRET_KEY is not set")
+  }
+  return new Paystack(process.env.PAYSTACK_SECRET_KEY)
 }
-
-export const paystack = new Paystack(process.env.PAYSTACK_SECRET_KEY)
 
 export const formatAmountForPaystack = (amount: number): number => {
   return Math.round(amount * 100) // Convert to kobo (smallest unit)

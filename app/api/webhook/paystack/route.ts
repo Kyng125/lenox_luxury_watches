@@ -3,12 +3,22 @@ import { createClient } from "@/lib/supabase/server"
 import { headers } from "next/headers"
 import crypto from "crypto"
 
-const webhookSecret = process.env.PAYSTACK_WEBHOOK_SECRET!
-
 export async function POST(request: NextRequest) {
   try {
     const body = await request.text()
-    const signature = headers().get("x-paystack-signature")!
+    const signature = headers().get("x-paystack-signature")
+
+    const webhookSecret = process.env.PAYSTACK_WEBHOOK_SECRET
+
+    if (!webhookSecret) {
+      console.error("PAYSTACK_WEBHOOK_SECRET is not set")
+      return NextResponse.json({ error: "Webhook secret not configured" }, { status: 500 })
+    }
+
+    if (!signature) {
+      console.error("Missing webhook signature")
+      return NextResponse.json({ error: "Missing signature" }, { status: 400 })
+    }
 
     // Verify webhook signature
     const hash = crypto.createHmac("sha512", webhookSecret).update(body).digest("hex")
