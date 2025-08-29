@@ -51,8 +51,20 @@ export function SimpleAdminDashboard() {
   const [editingCategory, setEditingCategory] = useState(null)
   const [categories, setCategories] = useState([])
   const [brands, setBrands] = useState([])
-  const [brandForm, setBrandForm] = useState({ name: "", description: "" })
-  const [categoryForm, setCategoryForm] = useState({ name: "", description: "" })
+  const [brandForm, setBrandForm] = useState({
+    name: "",
+    description: "",
+    logo_url: "",
+    country: "",
+    established: "",
+    images: [] as string[],
+  })
+  const [categoryForm, setCategoryForm] = useState({
+    name: "",
+    description: "",
+    image_url: "",
+    images: [] as string[],
+  })
   const [productForm, setProductForm] = useState({
     name: "",
     description: "",
@@ -165,18 +177,32 @@ export function SimpleAdminDashboard() {
       const response = await fetch("/api/brands", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(brandForm),
+        body: JSON.stringify({
+          ...brandForm,
+          logo_url: brandForm.images[0] || "",
+          established: brandForm.established ? Number.parseInt(brandForm.established) : null,
+        }),
       })
 
       if (response.ok) {
         setShowBrandDialog(false)
-        setBrandForm({ name: "", description: "" })
+        setBrandForm({
+          name: "",
+          description: "",
+          logo_url: "",
+          country: "",
+          established: "",
+          images: [],
+        })
         loadData()
       } else {
-        console.error("Failed to create brand")
+        const errorData = await response.json()
+        console.error("Failed to create brand:", errorData)
+        alert("Failed to create brand: " + (errorData.error || "Unknown error"))
       }
     } catch (error) {
       console.error("Error creating brand:", error)
+      alert("Error creating brand. Please try again.")
     }
   }
 
@@ -223,18 +249,29 @@ export function SimpleAdminDashboard() {
       const response = await fetch("/api/categories", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(categoryForm),
+        body: JSON.stringify({
+          ...categoryForm,
+          image_url: categoryForm.images[0] || "",
+        }),
       })
 
       if (response.ok) {
         setShowCategoryDialog(false)
-        setCategoryForm({ name: "", description: "" })
+        setCategoryForm({
+          name: "",
+          description: "",
+          image_url: "",
+          images: [],
+        })
         loadData()
       } else {
-        console.error("Failed to create category")
+        const errorData = await response.json()
+        console.error("Failed to create category:", errorData)
+        alert("Failed to create category: " + (errorData.error || "Unknown error"))
       }
     } catch (error) {
       console.error("Error creating category:", error)
+      alert("Error creating category. Please try again.")
     }
   }
 
@@ -755,6 +792,7 @@ export function SimpleAdminDashboard() {
                                       product.images?.[0] ||
                                       product.image_url ||
                                       "/placeholder.svg" ||
+                                      "/placeholder.svg" ||
                                       "/placeholder.svg"
                                     }
                                     alt={product.name}
@@ -925,6 +963,35 @@ export function SimpleAdminDashboard() {
                               placeholder="Brief description of the brand..."
                             />
                           </div>
+                          <div>
+                            <Label htmlFor="brandCountry">Country</Label>
+                            <Input
+                              id="brandCountry"
+                              value={brandForm.country}
+                              onChange={(e) => setBrandForm({ ...brandForm, country: e.target.value })}
+                              className="bg-gray-800 border-gray-700"
+                              placeholder="e.g., Switzerland, Germany"
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="brandEstablished">Established Year</Label>
+                            <Input
+                              id="brandEstablished"
+                              type="number"
+                              value={brandForm.established}
+                              onChange={(e) => setBrandForm({ ...brandForm, established: e.target.value })}
+                              className="bg-gray-800 border-gray-700"
+                              placeholder="e.g., 1905"
+                            />
+                          </div>
+                          <div>
+                            <Label>Brand Logo</Label>
+                            <ImageUpload
+                              images={brandForm.images}
+                              onImagesChange={(images) => setBrandForm({ ...brandForm, images })}
+                              maxImages={1}
+                            />
+                          </div>
                           <div className="flex justify-end gap-2">
                             <Button
                               variant="outline"
@@ -1025,6 +1092,14 @@ export function SimpleAdminDashboard() {
                               onChange={(e) => setCategoryForm({ ...categoryForm, description: e.target.value })}
                               className="bg-gray-800 border-gray-700"
                               placeholder="Brief description of the category..."
+                            />
+                          </div>
+                          <div>
+                            <Label>Category Image</Label>
+                            <ImageUpload
+                              images={categoryForm.images}
+                              onImagesChange={(images) => setCategoryForm({ ...categoryForm, images })}
+                              maxImages={1}
                             />
                           </div>
                           <div className="flex justify-end gap-2">
