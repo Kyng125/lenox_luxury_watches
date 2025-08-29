@@ -174,17 +174,29 @@ export function SimpleAdminDashboard() {
 
   const handleCreateBrand = async () => {
     try {
+      console.log("[v0] Creating brand with data:", brandForm)
+
+      const brandData = {
+        name: brandForm.name,
+        description: brandForm.description,
+        logo_url: brandForm.images[0] || "",
+        country: brandForm.country,
+        established: brandForm.established ? Number.parseInt(brandForm.established) : null,
+      }
+
+      console.log("[v0] Sending brand data:", brandData)
+
       const response = await fetch("/api/brands", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...brandForm,
-          logo_url: brandForm.images[0] || "",
-          established: brandForm.established ? Number.parseInt(brandForm.established) : null,
-        }),
+        body: JSON.stringify(brandData),
       })
 
+      console.log("[v0] Brand API response status:", response.status)
+
       if (response.ok) {
+        const result = await response.json()
+        console.log("[v0] Brand created successfully:", result)
         setShowBrandDialog(false)
         setBrandForm({
           name: "",
@@ -195,14 +207,15 @@ export function SimpleAdminDashboard() {
           images: [],
         })
         loadData()
+        alert("Brand created successfully!")
       } else {
         const errorData = await response.json()
-        console.error("Failed to create brand:", errorData)
+        console.error("[v0] Failed to create brand:", errorData)
         alert("Failed to create brand: " + (errorData.error || "Unknown error"))
       }
     } catch (error) {
-      console.error("Error creating brand:", error)
-      alert("Error creating brand. Please try again.")
+      console.error("[v0] Error creating brand:", error)
+      alert("Error creating brand. Please check the console for details.")
     }
   }
 
@@ -246,16 +259,27 @@ export function SimpleAdminDashboard() {
 
   const handleCreateCategory = async () => {
     try {
+      console.log("[v0] Creating category with data:", categoryForm)
+
+      const categoryData = {
+        name: categoryForm.name,
+        description: categoryForm.description,
+        image_url: categoryForm.images[0] || "",
+      }
+
+      console.log("[v0] Sending category data:", categoryData)
+
       const response = await fetch("/api/categories", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...categoryForm,
-          image_url: categoryForm.images[0] || "",
-        }),
+        body: JSON.stringify(categoryData),
       })
 
+      console.log("[v0] Category API response status:", response.status)
+
       if (response.ok) {
+        const result = await response.json()
+        console.log("[v0] Category created successfully:", result)
         setShowCategoryDialog(false)
         setCategoryForm({
           name: "",
@@ -264,14 +288,15 @@ export function SimpleAdminDashboard() {
           images: [],
         })
         loadData()
+        alert("Category created successfully!")
       } else {
         const errorData = await response.json()
-        console.error("Failed to create category:", errorData)
+        console.error("[v0] Failed to create category:", errorData)
         alert("Failed to create category: " + (errorData.error || "Unknown error"))
       }
     } catch (error) {
-      console.error("Error creating category:", error)
-      alert("Error creating category. Please try again.")
+      console.error("[v0] Error creating category:", error)
+      alert("Error creating category. Please check the console for details.")
     }
   }
 
@@ -791,6 +816,7 @@ export function SimpleAdminDashboard() {
                                       product.product_images?.[0]?.url ||
                                       product.images?.[0] ||
                                       product.image_url ||
+                                      "/placeholder.svg" ||
                                       "/placeholder.svg" ||
                                       "/placeholder.svg" ||
                                       "/placeholder.svg"

@@ -28,7 +28,9 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const supabase = await createClient()
-    const { name, description, slug } = await request.json()
+    const { name, description, slug, image_url } = await request.json()
+
+    console.log("[v0] Received category data:", { name, description, slug, image_url })
 
     if (!name) {
       return NextResponse.json({ error: "Category name is required" }, { status: 400 })
@@ -48,6 +50,7 @@ export async function POST(request: Request) {
           name,
           description,
           slug: generatedSlug,
+          image_url: image_url || null,
         },
       ])
       .select()
@@ -55,12 +58,16 @@ export async function POST(request: Request) {
 
     if (error) {
       console.error("Error creating category:", error)
-      return NextResponse.json({ error: "Failed to create category" }, { status: 500 })
+      return NextResponse.json({ error: `Database error: ${error.message}` }, { status: 500 })
     }
 
+    console.log("[v0] Category created successfully:", category)
     return NextResponse.json({ category })
   } catch (error) {
     console.error("API Error:", error)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+    return NextResponse.json(
+      { error: `Internal server error: ${error instanceof Error ? error.message : "Unknown error"}` },
+      { status: 500 },
+    )
   }
 }

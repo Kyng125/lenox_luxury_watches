@@ -30,6 +30,8 @@ export async function POST(request: Request) {
     const supabase = await createClient()
     const { name, description, logo_url, country, established } = await request.json()
 
+    console.log("[v0] Received brand data:", { name, description, logo_url, country, established })
+
     if (!name) {
       return NextResponse.json({ error: "Brand name is required" }, { status: 400 })
     }
@@ -40,8 +42,8 @@ export async function POST(request: Request) {
         {
           name,
           description,
-          logo_url,
-          country,
+          logo_url: logo_url || null,
+          country: country || null,
           established: established ? Number.parseInt(established) : null,
         },
       ])
@@ -50,12 +52,16 @@ export async function POST(request: Request) {
 
     if (error) {
       console.error("Error creating brand:", error)
-      return NextResponse.json({ error: "Failed to create brand" }, { status: 500 })
+      return NextResponse.json({ error: `Database error: ${error.message}` }, { status: 500 })
     }
 
+    console.log("[v0] Brand created successfully:", brand)
     return NextResponse.json({ brand })
   } catch (error) {
     console.error("API Error:", error)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+    return NextResponse.json(
+      { error: `Internal server error: ${error instanceof Error ? error.message : "Unknown error"}` },
+      { status: 500 },
+    )
   }
 }
