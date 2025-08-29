@@ -3,12 +3,8 @@ import type { NextRequest } from "next/server"
 import { updateSession } from "@/lib/supabase/middleware"
 
 export async function middleware(request: NextRequest) {
-  // Handle Supabase auth session updates
-  const supabaseResponse = await updateSession(request)
-
-  // Check if the request is for admin routes
   if (request.nextUrl.pathname.startsWith("/admin")) {
-    // Skip login page
+    // Skip login page - allow access without admin session
     if (request.nextUrl.pathname === "/admin/login") {
       return NextResponse.next()
     }
@@ -19,8 +15,12 @@ export async function middleware(request: NextRequest) {
     if (!adminSession) {
       return NextResponse.redirect(new URL("/admin/login", request.url))
     }
+
+    // Admin is authenticated, continue to admin route
+    return NextResponse.next()
   }
 
+  const supabaseResponse = await updateSession(request)
   return supabaseResponse
 }
 

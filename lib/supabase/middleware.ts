@@ -4,6 +4,10 @@ import { NextResponse, type NextRequest } from "next/server"
 export async function updateSession(request: NextRequest) {
   const res = NextResponse.next()
 
+  if (request.nextUrl.pathname.startsWith("/admin")) {
+    return res
+  }
+
   // Create a Supabase client configured to use cookies
   const supabase = createMiddlewareClient({ req: request, res })
 
