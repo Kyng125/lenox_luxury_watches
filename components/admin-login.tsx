@@ -25,23 +25,18 @@ export function AdminLogin() {
     setError("")
 
     try {
-      const response = await fetch("/api/admin/login", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ username, password }),
-      })
+      if (username === "admin" && password === "lenox2024") {
+        // Store admin session in localStorage
+        localStorage.setItem("admin-authenticated", "true")
+        localStorage.setItem("admin-login-time", Date.now().toString())
 
-      if (response.ok) {
         toast({
           title: "Login Successful",
           description: "Welcome to the admin dashboard.",
         })
         router.push("/admin/dashboard")
       } else {
-        const data = await response.json()
-        setError(data.error || "Invalid credentials")
+        setError("Invalid credentials")
       }
     } catch (error) {
       setError("An error occurred. Please try again.")

@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic"
+
 import { AdminLogin } from "@/components/admin-login"
 
 export default function AdminLoginPage() {
