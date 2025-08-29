@@ -18,7 +18,20 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
-import { Eye, Package, ShoppingCart, DollarSign, Plus, Edit, Trash2, Star, StarOff } from "lucide-react"
+import {
+  Eye,
+  Package,
+  ShoppingCart,
+  DollarSign,
+  Plus,
+  Edit,
+  Trash2,
+  Star,
+  StarOff,
+  Tag,
+  Building2,
+  AlertTriangle,
+} from "lucide-react"
 import { ImageUpload } from "@/components/image-upload"
 
 export function SimpleAdminDashboard() {
@@ -32,8 +45,14 @@ export function SimpleAdminDashboard() {
   const [editingProduct, setEditingProduct] = useState(null)
   const [editingOrder, setEditingOrder] = useState(null)
   const [showProductDialog, setShowProductDialog] = useState(false)
+  const [showBrandDialog, setShowBrandDialog] = useState(false)
+  const [showCategoryDialog, setShowCategoryDialog] = useState(false)
+  const [editingBrand, setEditingBrand] = useState(null)
+  const [editingCategory, setEditingCategory] = useState(null)
   const [categories, setCategories] = useState([])
   const [brands, setBrands] = useState([])
+  const [brandForm, setBrandForm] = useState({ name: "", description: "" })
+  const [categoryForm, setCategoryForm] = useState({ name: "", description: "" })
   const [productForm, setProductForm] = useState({
     name: "",
     description: "",
@@ -41,6 +60,7 @@ export function SimpleAdminDashboard() {
     brand_id: "",
     category_id: "",
     is_featured: false,
+    stock_quantity: "", // Added stock quantity field
     images: [],
   })
 
@@ -140,6 +160,122 @@ export function SimpleAdminDashboard() {
     }
   }
 
+  const handleCreateBrand = async () => {
+    try {
+      const response = await fetch("/api/brands", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(brandForm),
+      })
+
+      if (response.ok) {
+        setShowBrandDialog(false)
+        setBrandForm({ name: "", description: "" })
+        loadData()
+      } else {
+        console.error("Failed to create brand")
+      }
+    } catch (error) {
+      console.error("Error creating brand:", error)
+    }
+  }
+
+  const handleUpdateBrand = async (brandId, updates) => {
+    try {
+      const response = await fetch(`/api/brands/${brandId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updates),
+      })
+
+      if (response.ok) {
+        setEditingBrand(null)
+        loadData()
+      } else {
+        console.error("Failed to update brand")
+      }
+    } catch (error) {
+      console.error("Error updating brand:", error)
+    }
+  }
+
+  const handleDeleteBrand = async (brandId) => {
+    if (confirm("Are you sure you want to delete this brand?")) {
+      try {
+        const response = await fetch(`/api/brands/${brandId}`, {
+          method: "DELETE",
+        })
+
+        if (response.ok) {
+          loadData()
+        } else {
+          const errorData = await response.json()
+          alert(errorData.error || "Failed to delete brand")
+        }
+      } catch (error) {
+        console.error("Error deleting brand:", error)
+      }
+    }
+  }
+
+  const handleCreateCategory = async () => {
+    try {
+      const response = await fetch("/api/categories", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(categoryForm),
+      })
+
+      if (response.ok) {
+        setShowCategoryDialog(false)
+        setCategoryForm({ name: "", description: "" })
+        loadData()
+      } else {
+        console.error("Failed to create category")
+      }
+    } catch (error) {
+      console.error("Error creating category:", error)
+    }
+  }
+
+  const handleUpdateCategory = async (categoryId, updates) => {
+    try {
+      const response = await fetch(`/api/categories/${categoryId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updates),
+      })
+
+      if (response.ok) {
+        setEditingCategory(null)
+        loadData()
+      } else {
+        console.error("Failed to update category")
+      }
+    } catch (error) {
+      console.error("Error updating category:", error)
+    }
+  }
+
+  const handleDeleteCategory = async (categoryId) => {
+    if (confirm("Are you sure you want to delete this category?")) {
+      try {
+        const response = await fetch(`/api/categories/${categoryId}`, {
+          method: "DELETE",
+        })
+
+        if (response.ok) {
+          loadData()
+        } else {
+          const errorData = await response.json()
+          alert(errorData.error || "Failed to delete category")
+        }
+      } catch (error) {
+        console.error("Error deleting category:", error)
+      }
+    }
+  }
+
   const handleCreateProduct = async () => {
     try {
       const response = await fetch("/api/admin/products", {
@@ -148,6 +284,7 @@ export function SimpleAdminDashboard() {
         body: JSON.stringify({
           ...productForm,
           price: Number.parseFloat(productForm.price),
+          stock_quantity: Number.parseInt(productForm.stock_quantity) || 0, // Added stock quantity parsing
         }),
       })
 
@@ -160,6 +297,7 @@ export function SimpleAdminDashboard() {
           brand_id: "",
           category_id: "",
           is_featured: false,
+          stock_quantity: "", // Reset stock quantity
           images: [],
         })
         loadData()
@@ -286,6 +424,9 @@ export function SimpleAdminDashboard() {
   const totalOrders = Array.isArray(orders) ? orders.length : 0
   const totalProducts = Array.isArray(products) ? products.length : 0
   const pendingOrders = Array.isArray(orders) ? orders.filter((order) => order.status === "pending").length : 0
+  const lowStockProducts = Array.isArray(products)
+    ? products.filter((product) => (product.stock_quantity || 0) < 5).length
+    : 0
 
   return (
     <div className="min-h-screen bg-black text-white">
@@ -310,7 +451,7 @@ export function SimpleAdminDashboard() {
         ) : (
           <>
             {/* Stats Overview */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
               <Card className="bg-gray-900 border-gray-800">
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
@@ -358,6 +499,20 @@ export function SimpleAdminDashboard() {
                   </div>
                 </CardContent>
               </Card>
+
+              <Card className="bg-gray-900 border-gray-800">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-gray-400 text-sm">Low Stock</p>
+                      <p className={`text-2xl font-bold ${lowStockProducts > 0 ? "text-red-400" : "text-white"}`}>
+                        {lowStockProducts}
+                      </p>
+                    </div>
+                    <AlertTriangle className={`h-8 w-8 ${lowStockProducts > 0 ? "text-red-400" : "text-gold"}`} />
+                  </div>
+                </CardContent>
+              </Card>
             </div>
 
             {/* Main Content Tabs */}
@@ -371,6 +526,12 @@ export function SimpleAdminDashboard() {
                 </TabsTrigger>
                 <TabsTrigger value="featured" className="data-[state=active]:bg-gold data-[state=active]:text-black">
                   Featured Products
+                </TabsTrigger>
+                <TabsTrigger value="brands" className="data-[state=active]:bg-gold data-[state=active]:text-black">
+                  Brand Management
+                </TabsTrigger>
+                <TabsTrigger value="categories" className="data-[state=active]:bg-gold data-[state=active]:text-black">
+                  Category Management
                 </TabsTrigger>
               </TabsList>
 
@@ -473,7 +634,7 @@ export function SimpleAdminDashboard() {
                               className="bg-gray-800 border-gray-700"
                             />
                           </div>
-                          <div className="grid grid-cols-2 gap-4">
+                          <div className="grid grid-cols-3 gap-4">
                             <div>
                               <Label htmlFor="price">Price (₦)</Label>
                               <Input
@@ -481,6 +642,17 @@ export function SimpleAdminDashboard() {
                                 type="number"
                                 value={productForm.price}
                                 onChange={(e) => setProductForm({ ...productForm, price: e.target.value })}
+                                className="bg-gray-800 border-gray-700"
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor="stock">Stock Quantity</Label>
+                              <Input
+                                id="stock"
+                                type="number"
+                                min="0"
+                                value={productForm.stock_quantity}
+                                onChange={(e) => setProductForm({ ...productForm, stock_quantity: e.target.value })}
                                 className="bg-gray-800 border-gray-700"
                               />
                             </div>
@@ -569,6 +741,12 @@ export function SimpleAdminDashboard() {
                                   Featured
                                 </Badge>
                               )}
+                              {(product.stock_quantity || 0) < 5 && (
+                                <Badge className="absolute top-2 left-2 bg-red-600 text-white">
+                                  <AlertTriangle className="h-3 w-3 mr-1" />
+                                  Low Stock
+                                </Badge>
+                              )}
                               <div className="aspect-square bg-gray-700 rounded-lg mb-3 flex items-center justify-center">
                                 {product.product_images?.[0]?.url || product.images?.[0] || product.image_url ? (
                                   <img
@@ -590,6 +768,11 @@ export function SimpleAdminDashboard() {
                               <p className="text-gold font-bold">₦{(product.price || 0).toLocaleString()}</p>
                               <p className="text-sm text-gray-400">
                                 {product.brands?.name || product.brand?.name || product.brand || "Unknown Brand"}
+                              </p>
+                              <p
+                                className={`text-xs ${(product.stock_quantity || 0) < 5 ? "text-red-400" : "text-gray-500"}`}
+                              >
+                                Stock: {product.stock_quantity || 0} units
                               </p>
                               <div className="flex gap-2 mt-3">
                                 <Button
@@ -694,6 +877,216 @@ export function SimpleAdminDashboard() {
                         <li>• Use the star button in Product Management to add/remove featured status</li>
                       </ul>
                     </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="brands" className="space-y-4">
+                <Card className="bg-gray-900 border-gray-800">
+                  <CardHeader className="flex flex-row items-center justify-between">
+                    <div>
+                      <CardTitle className="text-gold">Brand Management</CardTitle>
+                      <CardDescription className="text-gray-400">
+                        Manage watch brands for product categorization
+                      </CardDescription>
+                    </div>
+                    <Dialog open={showBrandDialog} onOpenChange={setShowBrandDialog}>
+                      <DialogTrigger asChild>
+                        <Button className="bg-gold hover:bg-gold/90 text-black">
+                          <Plus className="h-4 w-4 mr-2" />
+                          Add Brand
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="bg-gray-900 border-gray-800 text-white">
+                        <DialogHeader>
+                          <DialogTitle className="text-gold">Add New Brand</DialogTitle>
+                          <DialogDescription className="text-gray-400">
+                            Create a new luxury watch brand
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4">
+                          <div>
+                            <Label htmlFor="brandName">Brand Name</Label>
+                            <Input
+                              id="brandName"
+                              value={brandForm.name}
+                              onChange={(e) => setBrandForm({ ...brandForm, name: e.target.value })}
+                              className="bg-gray-800 border-gray-700"
+                              placeholder="e.g., Rolex, Omega, Patek Philippe"
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="brandDescription">Description</Label>
+                            <Textarea
+                              id="brandDescription"
+                              value={brandForm.description}
+                              onChange={(e) => setBrandForm({ ...brandForm, description: e.target.value })}
+                              className="bg-gray-800 border-gray-700"
+                              placeholder="Brief description of the brand..."
+                            />
+                          </div>
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              variant="outline"
+                              onClick={() => setShowBrandDialog(false)}
+                              className="border-gray-700 text-gray-300 hover:bg-gray-800"
+                            >
+                              Cancel
+                            </Button>
+                            <Button onClick={handleCreateBrand} className="bg-gold hover:bg-gold/90 text-black">
+                              Create Brand
+                            </Button>
+                          </div>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                  </CardHeader>
+                  <CardContent>
+                    {brands.length === 0 ? (
+                      <p className="text-gray-400 text-center py-8">
+                        No brands found. Add your first brand to get started.
+                      </p>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {brands.map((brand) => (
+                          <div key={brand.id} className="bg-gray-800 rounded-lg p-4">
+                            <div className="flex items-start justify-between mb-2">
+                              <Building2 className="h-6 w-6 text-gold" />
+                              <div className="flex gap-2">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => setEditingBrand(brand)}
+                                  className="border-gray-700 text-gray-300 hover:bg-gray-700"
+                                >
+                                  <Edit className="h-3 w-3" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleDeleteBrand(brand.id)}
+                                  className="border-red-700 text-red-400 hover:bg-red-900/20"
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            </div>
+                            <h3 className="font-semibold text-white text-lg mb-1">{brand.name}</h3>
+                            <p className="text-sm text-gray-400 mb-2">{brand.description}</p>
+                            <p className="text-xs text-gray-500">
+                              Products:{" "}
+                              {products.filter((p) => p.brand_id === brand.id || p.brands?.id === brand.id).length}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="categories" className="space-y-4">
+                <Card className="bg-gray-900 border-gray-800">
+                  <CardHeader className="flex flex-row items-center justify-between">
+                    <div>
+                      <CardTitle className="text-gold">Category Management</CardTitle>
+                      <CardDescription className="text-gray-400">
+                        Manage product categories for better organization
+                      </CardDescription>
+                    </div>
+                    <Dialog open={showCategoryDialog} onOpenChange={setShowCategoryDialog}>
+                      <DialogTrigger asChild>
+                        <Button className="bg-gold hover:bg-gold/90 text-black">
+                          <Plus className="h-4 w-4 mr-2" />
+                          Add Category
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="bg-gray-900 border-gray-800 text-white">
+                        <DialogHeader>
+                          <DialogTitle className="text-gold">Add New Category</DialogTitle>
+                          <DialogDescription className="text-gray-400">Create a new product category</DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4">
+                          <div>
+                            <Label htmlFor="categoryName">Category Name</Label>
+                            <Input
+                              id="categoryName"
+                              value={categoryForm.name}
+                              onChange={(e) => setCategoryForm({ ...categoryForm, name: e.target.value })}
+                              className="bg-gray-800 border-gray-700"
+                              placeholder="e.g., Dress Watches, Sports Watches, Chronographs"
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="categoryDescription">Description</Label>
+                            <Textarea
+                              id="categoryDescription"
+                              value={categoryForm.description}
+                              onChange={(e) => setCategoryForm({ ...categoryForm, description: e.target.value })}
+                              className="bg-gray-800 border-gray-700"
+                              placeholder="Brief description of the category..."
+                            />
+                          </div>
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              variant="outline"
+                              onClick={() => setShowCategoryDialog(false)}
+                              className="border-gray-700 text-gray-300 hover:bg-gray-800"
+                            >
+                              Cancel
+                            </Button>
+                            <Button onClick={handleCreateCategory} className="bg-gold hover:bg-gold/90 text-black">
+                              Create Category
+                            </Button>
+                          </div>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                  </CardHeader>
+                  <CardContent>
+                    {categories.length === 0 ? (
+                      <p className="text-gray-400 text-center py-8">
+                        No categories found. Add your first category to get started.
+                      </p>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {categories.map((category) => (
+                          <div key={category.id} className="bg-gray-800 rounded-lg p-4">
+                            <div className="flex items-start justify-between mb-2">
+                              <Tag className="h-6 w-6 text-gold" />
+                              <div className="flex gap-2">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => setEditingCategory(category)}
+                                  className="border-gray-700 text-gray-300 hover:bg-gray-700"
+                                >
+                                  <Edit className="h-3 w-3" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleDeleteCategory(category.id)}
+                                  className="border-red-700 text-red-400 hover:bg-red-900/20"
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            </div>
+                            <h3 className="font-semibold text-white text-lg mb-1">{category.name}</h3>
+                            <p className="text-sm text-gray-400 mb-2">{category.description}</p>
+                            <p className="text-xs text-gray-500">
+                              Products:{" "}
+                              {
+                                products.filter(
+                                  (p) => p.category_id === category.id || p.categories?.id === category.id,
+                                ).length
+                              }
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               </TabsContent>
