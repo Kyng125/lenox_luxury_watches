@@ -50,17 +50,30 @@ export function SimpleAdminDashboard() {
       const productsRes = await fetch("/api/products")
       if (productsRes.ok) {
         const productsData = await productsRes.json()
-        setProducts(productsData)
+        setProducts(Array.isArray(productsData) ? productsData : [])
+      } else {
+        console.warn("Failed to load products:", productsRes.status)
+        setProducts([])
       }
 
-      // Load orders
-      const ordersRes = await fetch("/api/orders")
-      if (ordersRes.ok) {
-        const ordersData = await ordersRes.json()
-        setOrders(ordersData)
+      // Load orders - skip if API doesn't exist or returns error
+      try {
+        const ordersRes = await fetch("/api/orders")
+        if (ordersRes.ok) {
+          const ordersData = await ordersRes.json()
+          setOrders(Array.isArray(ordersData) ? ordersData : [])
+        } else {
+          console.warn("Orders API not available:", ordersRes.status)
+          setOrders([])
+        }
+      } catch (orderError) {
+        console.warn("Orders API error:", orderError)
+        setOrders([])
       }
     } catch (error) {
       console.error("Error loading data:", error)
+      setProducts([])
+      setOrders([])
     } finally {
       setLoading(false)
     }
@@ -96,10 +109,10 @@ export function SimpleAdminDashboard() {
     )
   }
 
-  const totalRevenue = orders.reduce((sum, order) => sum + (order.total || 0), 0)
-  const totalOrders = orders.length
-  const totalProducts = products.length
-  const pendingOrders = orders.filter((order) => order.status === "pending").length
+  const totalRevenue = Array.isArray(orders) ? orders.reduce((sum, order) => sum + (order.total || 0), 0) : 0
+  const totalOrders = Array.isArray(orders) ? orders.length : 0
+  const totalProducts = Array.isArray(products) ? products.length : 0
+  const pendingOrders = Array.isArray(orders) ? orders.filter((order) => order.status === "pending").length : 0
 
   return (
     <div className="min-h-screen bg-black text-white">
@@ -192,26 +205,30 @@ export function SimpleAdminDashboard() {
                     <CardDescription className="text-gray-400">Latest customer orders and their status</CardDescription>
                   </CardHeader>
                   <CardContent>
-                    {orders.length === 0 ? (
+                    {Array.isArray(orders) && orders.length === 0 ? (
                       <p className="text-gray-400 text-center py-8">No orders found</p>
                     ) : (
                       <div className="space-y-4">
-                        {orders.slice(0, 10).map((order, index) => (
-                          <div key={index} className="flex items-center justify-between p-4 bg-gray-800 rounded-lg">
-                            <div>
-                              <p className="font-semibold text-white">Order #{order.id || index + 1}</p>
-                              <p className="text-sm text-gray-400">
-                                {order.customerEmail || "Customer"} • {order.items?.length || 1} items
-                              </p>
+                        {Array.isArray(orders) &&
+                          orders.slice(0, 10).map((order, index) => (
+                            <div
+                              key={order.id || index}
+                              className="flex items-center justify-between p-4 bg-gray-800 rounded-lg"
+                            >
+                              <div>
+                                <p className="font-semibold text-white">Order #{order.id || index + 1}</p>
+                                <p className="text-sm text-gray-400">
+                                  {order.customerEmail || "Customer"} • {order.items?.length || 1} items
+                                </p>
+                              </div>
+                              <div className="text-right">
+                                <p className="font-semibold text-gold">₦{(order.total || 0).toLocaleString()}</p>
+                                <Badge variant={order.status === "completed" ? "default" : "secondary"}>
+                                  {order.status || "pending"}
+                                </Badge>
+                              </div>
                             </div>
-                            <div className="text-right">
-                              <p className="font-semibold text-gold">₦{(order.total || 0).toLocaleString()}</p>
-                              <Badge variant={order.status === "completed" ? "default" : "secondary"}>
-                                {order.status || "pending"}
-                              </Badge>
-                            </div>
-                          </div>
-                        ))}
+                          ))}
                       </div>
                     )}
                   </CardContent>
@@ -225,28 +242,29 @@ export function SimpleAdminDashboard() {
                     <CardDescription className="text-gray-400">Manage your watch collection</CardDescription>
                   </CardHeader>
                   <CardContent>
-                    {products.length === 0 ? (
+                    {Array.isArray(products) && products.length === 0 ? (
                       <p className="text-gray-400 text-center py-8">No products found</p>
                     ) : (
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {products.map((product, index) => (
-                          <div key={index} className="bg-gray-800 rounded-lg p-4">
-                            <div className="aspect-square bg-gray-700 rounded-lg mb-3 flex items-center justify-center">
-                              {product.images?.[0] ? (
-                                <img
-                                  src={product.images[0] || "/placeholder.svg"}
-                                  alt={product.name}
-                                  className="w-full h-full object-cover rounded-lg"
-                                />
-                              ) : (
-                                <Eye className="h-8 w-8 text-gray-500" />
-                              )}
+                        {Array.isArray(products) &&
+                          products.map((product, index) => (
+                            <div key={product.id || index} className="bg-gray-800 rounded-lg p-4">
+                              <div className="aspect-square bg-gray-700 rounded-lg mb-3 flex items-center justify-center">
+                                {product.images?.[0] ? (
+                                  <img
+                                    src={product.images[0] || "/placeholder.svg"}
+                                    alt={product.name}
+                                    className="w-full h-full object-cover rounded-lg"
+                                  />
+                                ) : (
+                                  <Eye className="h-8 w-8 text-gray-500" />
+                                )}
+                              </div>
+                              <h3 className="font-semibold text-white mb-1">{product.name || "Unnamed Product"}</h3>
+                              <p className="text-gold font-bold">₦{(product.price || 0).toLocaleString()}</p>
+                              <p className="text-sm text-gray-400">{product.brand || "Unknown Brand"}</p>
                             </div>
-                            <h3 className="font-semibold text-white mb-1">{product.name || "Unnamed Product"}</h3>
-                            <p className="text-gold font-bold">₦{(product.price || 0).toLocaleString()}</p>
-                            <p className="text-sm text-gray-400">{product.brand || "Unknown Brand"}</p>
-                          </div>
-                        ))}
+                          ))}
                       </div>
                     )}
                   </CardContent>
