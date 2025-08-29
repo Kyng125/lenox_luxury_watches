@@ -12,7 +12,9 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Separator } from "@/components/ui/separator"
-import { Plus, X, Save, ArrowLeft } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Plus, X, Save, ArrowLeft, Package, AlertTriangle, TrendingUp, TrendingDown } from "lucide-react"
 import Link from "next/link"
 import { toast } from "@/hooks/use-toast"
 import { ImageUpload } from "./image-upload"
@@ -50,11 +52,24 @@ interface Brand {
   description?: string
 }
 
+interface InventoryMovement {
+  id: string
+  movement_type: string
+  quantity_change: number
+  previous_quantity: number
+  new_quantity: number
+  created_at: string
+  notes?: string
+}
+
 export function AdminProductForm({ productId }: AdminProductFormProps) {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
   const [categories, setCategories] = useState<Category[]>([])
   const [brands, setBrands] = useState<Brand[]>([])
+  const [inventoryMovements, setInventoryMovements] = useState<InventoryMovement[]>([])
+  const [stockAdjustment, setStockAdjustment] = useState({ quantity: "", notes: "", type: "restock" })
+  const [originalStockQuantity, setOriginalStockQuantity] = useState(0)
   const [formData, setFormData] = useState<ProductFormData>({
     name: "",
     description: "",
@@ -80,6 +95,7 @@ export function AdminProductForm({ productId }: AdminProductFormProps) {
   useEffect(() => {
     if (productId) {
       loadProduct(productId)
+      loadInventoryMovements(productId)
     }
   }, [productId])
 
@@ -113,13 +129,15 @@ export function AdminProductForm({ productId }: AdminProductFormProps) {
       const response = await fetch(`/api/admin/products/${id}`)
       if (response.ok) {
         const product = await response.json()
+        const stockQty = product.stock_quantity || 0
+        setOriginalStockQuantity(stockQty)
         setFormData({
           name: product.name || "",
           description: product.description || "",
           price: product.price?.toString() || "",
           sale_price: product.sale_price?.toString() || "",
           sku: product.sku || "",
-          stock_quantity: product.stock_quantity?.toString() || "",
+          stock_quantity: stockQty.toString(),
           category_id: product.category_id || "",
           brand_id: product.brand_id || "",
           is_active: product.is_active !== false,
@@ -143,12 +161,74 @@ export function AdminProductForm({ productId }: AdminProductFormProps) {
     }
   }
 
-  // Generate slug from name
-  const generateSlug = (name: string) => {
-    return name
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/(^-|-$)/g, "")
+  const loadInventoryMovements = async (productId: string) => {
+    try {
+      const response = await fetch(`/api/admin/inventory/movements?productId=${productId}`)
+      if (response.ok) {
+        const data = await response.json()
+        setInventoryMovements(data.movements || [])
+      }
+    } catch (error) {
+      console.error("Error loading inventory movements:", error)
+    }
+  }
+
+  const handleStockAdjustment = async () => {
+    if (!productId || !stockAdjustment.quantity) {
+      toast({
+        title: "Error",
+        description: "Please enter a quantity to adjust.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      const response = await fetch("/api/admin/inventory", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          productId,
+          quantity: Number.parseInt(stockAdjustment.quantity),
+          movementType: stockAdjustment.type,
+          notes: stockAdjustment.notes || "Manual stock adjustment",
+        }),
+      })
+
+      if (response.ok) {
+        toast({
+          title: "Stock Updated",
+          description: "Stock quantity has been updated successfully.",
+        })
+        // Reload product data to get updated stock
+        loadProduct(productId)
+        loadInventoryMovements(productId)
+        setStockAdjustment({ quantity: "", notes: "", type: "restock" })
+      } else {
+        throw new Error("Failed to update stock")
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update stock quantity.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const getStockStatus = (quantity: number) => {
+    if (quantity === 0) return { status: "Out of Stock", color: "bg-red-500", icon: AlertTriangle }
+    if (quantity <= 5) return { status: "Low Stock", color: "bg-yellow-500", icon: AlertTriangle }
+    if (quantity <= 20) return { status: "In Stock", color: "bg-blue-500", icon: Package }
+    return { status: "Well Stocked", color: "bg-green-500", icon: TrendingUp }
+  }
+
+  const calculateInventoryValue = () => {
+    const quantity = Number.parseInt(formData.stock_quantity) || 0
+    const price = Number.parseFloat(formData.price) || 0
+    return quantity * price
   }
 
   const handleInputChange = (field: keyof ProductFormData, value: any) => {
@@ -239,6 +319,10 @@ export function AdminProductForm({ productId }: AdminProductFormProps) {
       setIsLoading(false)
     }
   }
+
+  const currentStock = Number.parseInt(formData.stock_quantity) || 0
+  const stockStatus = getStockStatus(currentStock)
+  const StatusIcon = stockStatus.icon
 
   return (
     <form onSubmit={handleSubmit} className="space-y-8">
@@ -341,15 +425,18 @@ export function AdminProductForm({ productId }: AdminProductFormProps) {
                   <Label htmlFor="stock_quantity" className="text-gray-300">
                     Stock Quantity *
                   </Label>
-                  <Input
-                    id="stock_quantity"
-                    type="number"
-                    value={formData.stock_quantity}
-                    onChange={(e) => handleInputChange("stock_quantity", e.target.value)}
-                    placeholder="0"
-                    className="bg-gray-900 border-gray-700 text-white"
-                    required
-                  />
+                  <div className="relative">
+                    <Input
+                      id="stock_quantity"
+                      type="number"
+                      value={formData.stock_quantity}
+                      onChange={(e) => handleInputChange("stock_quantity", e.target.value)}
+                      placeholder="0"
+                      className="bg-gray-900 border-gray-700 text-white pr-10"
+                      required
+                    />
+                    <StatusIcon className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  </div>
                 </div>
               </div>
 
@@ -464,6 +551,95 @@ export function AdminProductForm({ productId }: AdminProductFormProps) {
         <div className="space-y-6">
           <Card className="bg-black border-yellow-600/20">
             <CardHeader>
+              <CardTitle className="font-serif text-yellow-600 flex items-center gap-2">
+                <Package className="h-5 w-5" />
+                Inventory Management
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-gray-300">Current Stock:</span>
+                <Badge className={`${stockStatus.color} text-white`}>{currentStock} units</Badge>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <span className="text-gray-300">Status:</span>
+                <Badge variant="outline" className="border-gray-600 text-gray-300">
+                  {stockStatus.status}
+                </Badge>
+              </div>
+
+              {formData.price && (
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-300">Inventory Value:</span>
+                  <span className="text-yellow-400 font-semibold">${calculateInventoryValue().toLocaleString()}</span>
+                </div>
+              )}
+
+              {currentStock <= 5 && (
+                <Alert className="border-yellow-600/20 bg-yellow-600/10">
+                  <AlertTriangle className="h-4 w-4 text-yellow-400" />
+                  <AlertDescription className="text-yellow-300">
+                    {currentStock === 0 ? "Product is out of stock!" : "Low stock alert - consider restocking soon."}
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {productId && (
+                <>
+                  <Separator className="bg-gray-700" />
+                  <div className="space-y-3">
+                    <Label className="text-gray-300">Quick Stock Adjustment</Label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Input
+                        type="number"
+                        placeholder="Quantity"
+                        value={stockAdjustment.quantity}
+                        onChange={(e) => setStockAdjustment((prev) => ({ ...prev, quantity: e.target.value }))}
+                        className="bg-gray-900 border-gray-700 text-white"
+                      />
+                      <Select
+                        value={stockAdjustment.type}
+                        onValueChange={(value) => setStockAdjustment((prev) => ({ ...prev, type: value }))}
+                      >
+                        <SelectTrigger className="bg-gray-900 border-gray-700 text-white">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="bg-gray-900 border-gray-700">
+                          <SelectItem value="restock" className="text-white">
+                            Restock
+                          </SelectItem>
+                          <SelectItem value="adjustment" className="text-white">
+                            Adjustment
+                          </SelectItem>
+                          <SelectItem value="return" className="text-white">
+                            Return
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <Input
+                      placeholder="Notes (optional)"
+                      value={stockAdjustment.notes}
+                      onChange={(e) => setStockAdjustment((prev) => ({ ...prev, notes: e.target.value }))}
+                      className="bg-gray-900 border-gray-700 text-white"
+                    />
+                    <Button
+                      type="button"
+                      onClick={handleStockAdjustment}
+                      className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                      size="sm"
+                    >
+                      Update Stock
+                    </Button>
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="bg-black border-yellow-600/20">
+            <CardHeader>
               <CardTitle className="font-serif text-yellow-600">Product Status</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -518,6 +694,39 @@ export function AdminProductForm({ productId }: AdminProductFormProps) {
               </div>
             </CardContent>
           </Card>
+
+          {productId && inventoryMovements.length > 0 && (
+            <Card className="bg-black border-yellow-600/20">
+              <CardHeader>
+                <CardTitle className="font-serif text-yellow-600">Recent Stock Movements</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2 max-h-48 overflow-y-auto">
+                  {inventoryMovements.slice(0, 5).map((movement) => (
+                    <div key={movement.id} className="flex items-center justify-between text-sm">
+                      <div className="flex items-center gap-2">
+                        {movement.quantity_change > 0 ? (
+                          <TrendingUp className="h-3 w-3 text-green-400" />
+                        ) : (
+                          <TrendingDown className="h-3 w-3 text-red-400" />
+                        )}
+                        <span className="text-gray-300 capitalize">{movement.movement_type}</span>
+                      </div>
+                      <div className="text-right">
+                        <div className={movement.quantity_change > 0 ? "text-green-400" : "text-red-400"}>
+                          {movement.quantity_change > 0 ? "+" : ""}
+                          {movement.quantity_change}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          {new Date(movement.created_at).toLocaleDateString()}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
     </form>

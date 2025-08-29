@@ -576,6 +576,7 @@ export function SimpleAdminDashboard() {
                                       product.product_images?.[0]?.url ||
                                       product.images?.[0] ||
                                       product.image_url ||
+                                      "/placeholder.svg" ||
                                       "/placeholder.svg"
                                     }
                                     alt={product.name}

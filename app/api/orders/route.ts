@@ -25,6 +25,25 @@ export async function POST(request: NextRequest) {
       data: { user },
     } = await supabase.auth.getUser()
 
+    for (const item of items) {
+      const { data: product, error } = await supabase
+        .from("products")
+        .select("stock_quantity, name")
+        .eq("id", item.id)
+        .single()
+
+      if (error || !product) {
+        return NextResponse.json({ error: `Product ${item.name} not found` }, { status: 400 })
+      }
+
+      if (product.stock_quantity < item.quantity) {
+        return NextResponse.json(
+          { error: `Insufficient stock for ${product.name}. Available: ${product.stock_quantity}` },
+          { status: 400 },
+        )
+      }
+    }
+
     // Create user account if requested
     let userId = user?.id
     if (createAccount && !user && accountData) {
@@ -88,6 +107,18 @@ export async function POST(request: NextRequest) {
     if (itemsError) {
       console.error("Error creating order items:", itemsError)
       return NextResponse.json({ error: "Failed to create order items" }, { status: 500 })
+    }
+
+    for (const item of items) {
+      const { error: stockError } = await supabase.rpc("reduce_product_stock", {
+        product_id: item.id,
+        quantity_to_reduce: item.quantity,
+      })
+
+      if (stockError) {
+        console.error("Error reducing stock:", stockError)
+        // Continue processing but log the error
+      }
     }
 
     // Clear cart after successful order

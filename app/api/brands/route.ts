@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server"
 
 export async function GET() {
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
 
     const { data: brands, error } = await supabase
       .from("brands")
@@ -19,6 +19,41 @@ export async function GET() {
     }
 
     return NextResponse.json({ brands: brands || [] })
+  } catch (error) {
+    console.error("API Error:", error)
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+  }
+}
+
+export async function POST(request: Request) {
+  try {
+    const supabase = await createClient()
+    const { name, description, logo_url, country, established } = await request.json()
+
+    if (!name) {
+      return NextResponse.json({ error: "Brand name is required" }, { status: 400 })
+    }
+
+    const { data: brand, error } = await supabase
+      .from("brands")
+      .insert([
+        {
+          name,
+          description,
+          logo_url,
+          country,
+          established: established ? Number.parseInt(established) : null,
+        },
+      ])
+      .select()
+      .single()
+
+    if (error) {
+      console.error("Error creating brand:", error)
+      return NextResponse.json({ error: "Failed to create brand" }, { status: 500 })
+    }
+
+    return NextResponse.json({ brand })
   } catch (error) {
     console.error("API Error:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
