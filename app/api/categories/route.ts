@@ -28,20 +28,13 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const supabase = await createClient()
-    const { name, description, slug, image_url } = await request.json()
+    const { name, description, image_url } = await request.json()
 
-    console.log("[v0] Received category data:", { name, description, slug, image_url })
+    console.log("[v0] Received category data:", { name, description, image_url })
 
     if (!name) {
       return NextResponse.json({ error: "Category name is required" }, { status: 400 })
     }
-
-    const generatedSlug =
-      slug ||
-      name
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, "-")
-        .replace(/(^-|-$)/g, "")
 
     const { data: category, error } = await supabase
       .from("categories")
@@ -49,7 +42,6 @@ export async function POST(request: Request) {
         {
           name,
           description,
-          slug: generatedSlug,
           image_url: image_url || null,
         },
       ])

@@ -28,9 +28,9 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const supabase = await createClient()
-    const { name, description, logo_url, country, established } = await request.json()
+    const { name, description, logo_url } = await request.json()
 
-    console.log("[v0] Received brand data:", { name, description, logo_url, country, established })
+    console.log("[v0] Received brand data:", { name, description, logo_url })
 
     if (!name) {
       return NextResponse.json({ error: "Brand name is required" }, { status: 400 })
@@ -43,8 +43,6 @@ export async function POST(request: Request) {
           name,
           description,
           logo_url: logo_url || null,
-          country: country || null,
-          established: established ? Number.parseInt(established) : null,
         },
       ])
       .select()

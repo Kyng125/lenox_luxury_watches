@@ -49,20 +49,16 @@ export function SimpleAdminDashboard() {
   const [showCategoryDialog, setShowCategoryDialog] = useState(false)
   const [editingBrand, setEditingBrand] = useState(null)
   const [editingCategory, setEditingCategory] = useState(null)
-  const [categories, setCategories] = useState([])
   const [brands, setBrands] = useState([])
+  const [categories, setCategories] = useState([])
   const [brandForm, setBrandForm] = useState({
     name: "",
     description: "",
-    logo_url: "",
-    country: "",
-    established: "",
     images: [] as string[],
   })
   const [categoryForm, setCategoryForm] = useState({
     name: "",
     description: "",
-    image_url: "",
     images: [] as string[],
   })
   const [productForm, setProductForm] = useState({
@@ -180,8 +176,6 @@ export function SimpleAdminDashboard() {
         name: brandForm.name,
         description: brandForm.description,
         logo_url: brandForm.images[0] || "",
-        country: brandForm.country,
-        established: brandForm.established ? Number.parseInt(brandForm.established) : null,
       }
 
       console.log("[v0] Sending brand data:", brandData)
@@ -201,9 +195,6 @@ export function SimpleAdminDashboard() {
         setBrandForm({
           name: "",
           description: "",
-          logo_url: "",
-          country: "",
-          established: "",
           images: [],
         })
         loadData()
@@ -215,7 +206,7 @@ export function SimpleAdminDashboard() {
       }
     } catch (error) {
       console.error("[v0] Error creating brand:", error)
-      alert("Error creating brand. Please check the console for details.")
+      alert("Error creating brand: " + (error instanceof Error ? error.message : "Unknown error"))
     }
   }
 
@@ -284,7 +275,6 @@ export function SimpleAdminDashboard() {
         setCategoryForm({
           name: "",
           description: "",
-          image_url: "",
           images: [],
         })
         loadData()
@@ -296,7 +286,7 @@ export function SimpleAdminDashboard() {
       }
     } catch (error) {
       console.error("[v0] Error creating category:", error)
-      alert("Error creating category. Please check the console for details.")
+      alert("Error creating category: " + (error instanceof Error ? error.message : "Unknown error"))
     }
   }
 
@@ -340,17 +330,23 @@ export function SimpleAdminDashboard() {
 
   const handleCreateProduct = async () => {
     try {
+      console.log("[v0] Creating product with data:", productForm)
+
       const response = await fetch("/api/admin/products", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...productForm,
           price: Number.parseFloat(productForm.price),
-          stock_quantity: Number.parseInt(productForm.stock_quantity) || 0, // Added stock quantity parsing
+          stock_quantity: Number.parseInt(productForm.stock_quantity) || 0,
         }),
       })
 
+      console.log("[v0] Product API response status:", response.status)
+
       if (response.ok) {
+        const result = await response.json()
+        console.log("[v0] Product created successfully:", result)
         setShowProductDialog(false)
         setProductForm({
           name: "",
@@ -359,18 +355,22 @@ export function SimpleAdminDashboard() {
           brand_id: "",
           category_id: "",
           is_featured: false,
-          stock_quantity: "", // Reset stock quantity
+          stock_quantity: "",
           images: [],
         })
         loadData()
         if (productForm.is_featured) {
           window.dispatchEvent(new CustomEvent("featuredProductsUpdated"))
         }
+        alert("Product created successfully!")
       } else {
-        console.error("Failed to create product")
+        const errorData = await response.json()
+        console.error("[v0] Failed to create product:", errorData)
+        alert("Failed to create product: " + (errorData.error || "Unknown error"))
       }
     } catch (error) {
-      console.error("Error creating product:", error)
+      console.error("[v0] Error creating product:", error)
+      alert("Error creating product: " + (error instanceof Error ? error.message : "Unknown error"))
     }
   }
 
@@ -819,6 +819,7 @@ export function SimpleAdminDashboard() {
                                       "/placeholder.svg" ||
                                       "/placeholder.svg" ||
                                       "/placeholder.svg" ||
+                                      "/placeholder.svg" ||
                                       "/placeholder.svg"
                                     }
                                     alt={product.name}
@@ -987,27 +988,6 @@ export function SimpleAdminDashboard() {
                               onChange={(e) => setBrandForm({ ...brandForm, description: e.target.value })}
                               className="bg-gray-800 border-gray-700"
                               placeholder="Brief description of the brand..."
-                            />
-                          </div>
-                          <div>
-                            <Label htmlFor="brandCountry">Country</Label>
-                            <Input
-                              id="brandCountry"
-                              value={brandForm.country}
-                              onChange={(e) => setBrandForm({ ...brandForm, country: e.target.value })}
-                              className="bg-gray-800 border-gray-700"
-                              placeholder="e.g., Switzerland, Germany"
-                            />
-                          </div>
-                          <div>
-                            <Label htmlFor="brandEstablished">Established Year</Label>
-                            <Input
-                              id="brandEstablished"
-                              type="number"
-                              value={brandForm.established}
-                              onChange={(e) => setBrandForm({ ...brandForm, established: e.target.value })}
-                              className="bg-gray-800 border-gray-700"
-                              placeholder="e.g., 1905"
                             />
                           </div>
                           <div>
