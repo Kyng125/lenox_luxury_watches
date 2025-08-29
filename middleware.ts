@@ -1,14 +1,12 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
-import { updateSession } from "@/lib/supabase/middleware"
 
 export async function middleware(request: NextRequest) {
   if (request.nextUrl.pathname.startsWith("/admin")) {
     return NextResponse.next()
   }
 
-  const supabaseResponse = await updateSession(request)
-  return supabaseResponse
+  return NextResponse.next()
 }
 
 export const config = {
