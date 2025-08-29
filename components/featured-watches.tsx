@@ -29,6 +29,13 @@ export function FeaturedWatches() {
 
   useEffect(() => {
     loadFeaturedWatches()
+
+    const handleFeaturedUpdate = () => {
+      loadFeaturedWatches()
+    }
+
+    window.addEventListener("featuredProductsUpdated", handleFeaturedUpdate)
+    return () => window.removeEventListener("featuredProductsUpdated", handleFeaturedUpdate)
   }, [])
 
   const loadFeaturedWatches = async () => {

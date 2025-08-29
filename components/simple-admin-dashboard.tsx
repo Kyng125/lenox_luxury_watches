@@ -5,16 +5,44 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
-import { Eye, Package, ShoppingCart, DollarSign, TrendingUp } from "lucide-react"
+import { Eye, Package, ShoppingCart, DollarSign, Plus, Edit, Trash2, Star, StarOff } from "lucide-react"
+import { ImageUpload } from "@/components/image-upload"
 
 export function SimpleAdminDashboard() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
   const [products, setProducts] = useState([])
+  const [featuredProducts, setFeaturedProducts] = useState([])
   const [orders, setOrders] = useState([])
   const [loading, setLoading] = useState(false)
+  const [editingProduct, setEditingProduct] = useState(null)
+  const [editingOrder, setEditingOrder] = useState(null)
+  const [showProductDialog, setShowProductDialog] = useState(false)
+  const [categories, setCategories] = useState([])
+  const [brands, setBrands] = useState([])
+  const [productForm, setProductForm] = useState({
+    name: "",
+    description: "",
+    price: "",
+    brand_id: "",
+    category_id: "",
+    is_featured: false,
+    images: [],
+  })
 
   useEffect(() => {
     // Check if already authenticated
@@ -41,6 +69,7 @@ export function SimpleAdminDashboard() {
     localStorage.removeItem("dashboard-auth")
     setProducts([])
     setOrders([])
+    setFeaturedProducts([])
   }
 
   const loadData = async () => {
@@ -50,32 +79,174 @@ export function SimpleAdminDashboard() {
       const productsRes = await fetch("/api/products")
       if (productsRes.ok) {
         const productsData = await productsRes.json()
-        setProducts(Array.isArray(productsData) ? productsData : [])
-      } else {
-        console.warn("Failed to load products:", productsRes.status)
-        setProducts([])
+        setProducts(
+          Array.isArray(productsData.products)
+            ? productsData.products
+            : Array.isArray(productsData)
+              ? productsData
+              : [],
+        )
       }
 
-      // Load orders - skip if API doesn't exist or returns error
+      // Load featured products
+      const featuredRes = await fetch("/api/products?featured=true")
+      if (featuredRes.ok) {
+        const featuredData = await featuredRes.json()
+        setFeaturedProducts(Array.isArray(featuredData.products) ? featuredData.products : [])
+      }
+
+      // Load orders
       try {
         const ordersRes = await fetch("/api/orders")
         if (ordersRes.ok) {
           const ordersData = await ordersRes.json()
           setOrders(Array.isArray(ordersData) ? ordersData : [])
-        } else {
-          console.warn("Orders API not available:", ordersRes.status)
-          setOrders([])
         }
       } catch (orderError) {
         console.warn("Orders API error:", orderError)
         setOrders([])
       }
+
+      // Load categories
+      try {
+        const categoriesRes = await fetch("/api/categories")
+        if (categoriesRes.ok) {
+          const categoriesData = await categoriesRes.json()
+          setCategories(Array.isArray(categoriesData) ? categoriesData : [])
+        }
+      } catch (error) {
+        console.warn("Categories API error:", error)
+        setCategories([])
+      }
+
+      // Load brands
+      try {
+        const brandsRes = await fetch("/api/brands")
+        if (brandsRes.ok) {
+          const brandsData = await brandsRes.json()
+          setBrands(Array.isArray(brandsData) ? brandsData : [])
+        }
+      } catch (error) {
+        console.warn("Brands API error:", error)
+        setBrands([])
+      }
     } catch (error) {
       console.error("Error loading data:", error)
       setProducts([])
       setOrders([])
+      setFeaturedProducts([])
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleCreateProduct = async () => {
+    try {
+      const response = await fetch("/api/admin/products", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...productForm,
+          price: Number.parseFloat(productForm.price),
+        }),
+      })
+
+      if (response.ok) {
+        setShowProductDialog(false)
+        setProductForm({
+          name: "",
+          description: "",
+          price: "",
+          brand_id: "",
+          category_id: "",
+          is_featured: false,
+          images: [],
+        })
+        loadData()
+        if (productForm.is_featured) {
+          window.dispatchEvent(new CustomEvent("featuredProductsUpdated"))
+        }
+      } else {
+        console.error("Failed to create product")
+      }
+    } catch (error) {
+      console.error("Error creating product:", error)
+    }
+  }
+
+  const handleUpdateProduct = async (productId, updates) => {
+    try {
+      const response = await fetch(`/api/admin/products/${productId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updates),
+      })
+
+      if (response.ok) {
+        setEditingProduct(null)
+        loadData()
+        window.dispatchEvent(new CustomEvent("featuredProductsUpdated"))
+      } else {
+        console.error("Failed to update product")
+      }
+    } catch (error) {
+      console.error("Error updating product:", error)
+    }
+  }
+
+  const handleToggleFeatured = async (productId, currentFeaturedStatus) => {
+    try {
+      const response = await fetch(`/api/admin/products/${productId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ is_featured: !currentFeaturedStatus }),
+      })
+
+      if (response.ok) {
+        loadData()
+        window.dispatchEvent(new CustomEvent("featuredProductsUpdated"))
+      } else {
+        console.error("Failed to update featured status")
+      }
+    } catch (error) {
+      console.error("Error updating featured status:", error)
+    }
+  }
+
+  const handleDeleteProduct = async (productId) => {
+    if (confirm("Are you sure you want to delete this product?")) {
+      try {
+        const response = await fetch(`/api/admin/products/${productId}`, {
+          method: "DELETE",
+        })
+
+        if (response.ok) {
+          loadData()
+          window.dispatchEvent(new CustomEvent("featuredProductsUpdated"))
+        } else {
+          console.error("Failed to delete product")
+        }
+      } catch (error) {
+        console.error("Error deleting product:", error)
+      }
+    }
+  }
+
+  const handleUpdateOrderStatus = async (orderId, newStatus) => {
+    try {
+      const response = await fetch(`/api/orders/${orderId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus }),
+      })
+
+      if (response.ok) {
+        loadData()
+      } else {
+        console.error("Failed to update order status")
+      }
+    } catch (error) {
+      console.error("Error updating order:", error)
     }
   }
 
@@ -109,7 +280,9 @@ export function SimpleAdminDashboard() {
     )
   }
 
-  const totalRevenue = Array.isArray(orders) ? orders.reduce((sum, order) => sum + (order.total || 0), 0) : 0
+  const totalRevenue = Array.isArray(orders)
+    ? orders.reduce((sum, order) => sum + (order.total_amount || order.total || 0), 0)
+    : 0
   const totalOrders = Array.isArray(orders) ? orders.length : 0
   const totalProducts = Array.isArray(products) ? products.length : 0
   const pendingOrders = Array.isArray(orders) ? orders.filter((order) => order.status === "pending").length : 0
@@ -178,10 +351,10 @@ export function SimpleAdminDashboard() {
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-gray-400 text-sm">Pending Orders</p>
-                      <p className="text-2xl font-bold text-orange-400">{pendingOrders}</p>
+                      <p className="text-gray-400 text-sm">Featured Products</p>
+                      <p className="text-2xl font-bold text-gold">{featuredProducts.length}</p>
                     </div>
-                    <TrendingUp className="h-8 w-8 text-gold" />
+                    <Star className="h-8 w-8 text-gold" />
                   </div>
                 </CardContent>
               </Card>
@@ -191,18 +364,23 @@ export function SimpleAdminDashboard() {
             <Tabs defaultValue="orders" className="space-y-6">
               <TabsList className="bg-gray-900 border-gray-800">
                 <TabsTrigger value="orders" className="data-[state=active]:bg-gold data-[state=active]:text-black">
-                  Orders
+                  Order Management
                 </TabsTrigger>
                 <TabsTrigger value="products" className="data-[state=active]:bg-gold data-[state=active]:text-black">
-                  Products
+                  Product Management
+                </TabsTrigger>
+                <TabsTrigger value="featured" className="data-[state=active]:bg-gold data-[state=active]:text-black">
+                  Featured Products
                 </TabsTrigger>
               </TabsList>
 
               <TabsContent value="orders" className="space-y-4">
                 <Card className="bg-gray-900 border-gray-800">
                   <CardHeader>
-                    <CardTitle className="text-gold">Recent Orders</CardTitle>
-                    <CardDescription className="text-gray-400">Latest customer orders and their status</CardDescription>
+                    <CardTitle className="text-gold">Order Management</CardTitle>
+                    <CardDescription className="text-gray-400">
+                      Manage customer orders and update status
+                    </CardDescription>
                   </CardHeader>
                   <CardContent>
                     {Array.isArray(orders) && orders.length === 0 ? (
@@ -210,22 +388,42 @@ export function SimpleAdminDashboard() {
                     ) : (
                       <div className="space-y-4">
                         {Array.isArray(orders) &&
-                          orders.slice(0, 10).map((order, index) => (
+                          orders.map((order, index) => (
                             <div
                               key={order.id || index}
                               className="flex items-center justify-between p-4 bg-gray-800 rounded-lg"
                             >
-                              <div>
+                              <div className="flex-1">
                                 <p className="font-semibold text-white">Order #{order.id || index + 1}</p>
                                 <p className="text-sm text-gray-400">
-                                  {order.customerEmail || "Customer"} • {order.items?.length || 1} items
+                                  {order.customer_email || order.customerEmail || "Customer"} •{" "}
+                                  {order.items?.length || 1} items
+                                </p>
+                                <p className="text-xs text-gray-500">
+                                  {order.created_at ? new Date(order.created_at).toLocaleDateString() : "Recent"}
                                 </p>
                               </div>
-                              <div className="text-right">
-                                <p className="font-semibold text-gold">₦{(order.total || 0).toLocaleString()}</p>
-                                <Badge variant={order.status === "completed" ? "default" : "secondary"}>
-                                  {order.status || "pending"}
-                                </Badge>
+                              <div className="flex items-center gap-4">
+                                <div className="text-right">
+                                  <p className="font-semibold text-gold">
+                                    ₦{(order.total_amount || order.total || 0).toLocaleString()}
+                                  </p>
+                                  <Select
+                                    value={order.status || "pending"}
+                                    onValueChange={(newStatus) => handleUpdateOrderStatus(order.id, newStatus)}
+                                  >
+                                    <SelectTrigger className="w-32 bg-gray-700 border-gray-600">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="pending">Pending</SelectItem>
+                                      <SelectItem value="processing">Processing</SelectItem>
+                                      <SelectItem value="shipped">Shipped</SelectItem>
+                                      <SelectItem value="delivered">Delivered</SelectItem>
+                                      <SelectItem value="cancelled">Cancelled</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
                               </div>
                             </div>
                           ))}
@@ -237,9 +435,125 @@ export function SimpleAdminDashboard() {
 
               <TabsContent value="products" className="space-y-4">
                 <Card className="bg-gray-900 border-gray-800">
-                  <CardHeader>
-                    <CardTitle className="text-gold">Product Inventory</CardTitle>
-                    <CardDescription className="text-gray-400">Manage your watch collection</CardDescription>
+                  <CardHeader className="flex flex-row items-center justify-between">
+                    <div>
+                      <CardTitle className="text-gold">Product Management</CardTitle>
+                      <CardDescription className="text-gray-400">Manage your watch collection</CardDescription>
+                    </div>
+                    <Dialog open={showProductDialog} onOpenChange={setShowProductDialog}>
+                      <DialogTrigger asChild>
+                        <Button className="bg-gold hover:bg-gold/90 text-black">
+                          <Plus className="h-4 w-4 mr-2" />
+                          Add Product
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="bg-gray-900 border-gray-800 text-white max-w-2xl">
+                        <DialogHeader>
+                          <DialogTitle className="text-gold">Add New Product</DialogTitle>
+                          <DialogDescription className="text-gray-400">
+                            Create a new luxury watch product
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4">
+                          <div>
+                            <Label htmlFor="name">Product Name</Label>
+                            <Input
+                              id="name"
+                              value={productForm.name}
+                              onChange={(e) => setProductForm({ ...productForm, name: e.target.value })}
+                              className="bg-gray-800 border-gray-700"
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="description">Description</Label>
+                            <Textarea
+                              id="description"
+                              value={productForm.description}
+                              onChange={(e) => setProductForm({ ...productForm, description: e.target.value })}
+                              className="bg-gray-800 border-gray-700"
+                            />
+                          </div>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <Label htmlFor="price">Price (₦)</Label>
+                              <Input
+                                id="price"
+                                type="number"
+                                value={productForm.price}
+                                onChange={(e) => setProductForm({ ...productForm, price: e.target.value })}
+                                className="bg-gray-800 border-gray-700"
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor="brand">Brand</Label>
+                              <Select
+                                value={productForm.brand_id}
+                                onValueChange={(value) => setProductForm({ ...productForm, brand_id: value })}
+                              >
+                                <SelectTrigger className="bg-gray-800 border-gray-700">
+                                  <SelectValue placeholder="Select brand" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {brands.map((brand) => (
+                                    <SelectItem key={brand.id} value={brand.id.toString()}>
+                                      {brand.name}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+                          <div>
+                            <Label htmlFor="category">Category</Label>
+                            <Select
+                              value={productForm.category_id}
+                              onValueChange={(value) => setProductForm({ ...productForm, category_id: value })}
+                            >
+                              <SelectTrigger className="bg-gray-800 border-gray-700">
+                                <SelectValue placeholder="Select category" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {categories.map((category) => (
+                                  <SelectItem key={category.id} value={category.id.toString()}>
+                                    {category.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <Switch
+                              id="featured"
+                              checked={productForm.is_featured}
+                              onCheckedChange={(checked) => setProductForm({ ...productForm, is_featured: checked })}
+                            />
+                            <Label htmlFor="featured" className="text-sm font-medium">
+                              Mark as Featured Product
+                            </Label>
+                          </div>
+                          <div>
+                            <Label>Product Images</Label>
+                            <ImageUpload
+                              images={productForm.images}
+                              onImagesChange={(images) => setProductForm({ ...productForm, images })}
+                              maxImages={5}
+                            />
+                          </div>
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              variant="outline"
+                              onClick={() => setShowProductDialog(false)}
+                              className="border-gray-700 text-gray-300 hover:bg-gray-800"
+                            >
+                              Cancel
+                            </Button>
+                            <Button onClick={handleCreateProduct} className="bg-gold hover:bg-gold/90 text-black">
+                              Create Product
+                            </Button>
+                          </div>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
                   </CardHeader>
                   <CardContent>
                     {Array.isArray(products) && products.length === 0 ? (
@@ -248,11 +562,22 @@ export function SimpleAdminDashboard() {
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {Array.isArray(products) &&
                           products.map((product, index) => (
-                            <div key={product.id || index} className="bg-gray-800 rounded-lg p-4">
+                            <div key={product.id || index} className="bg-gray-800 rounded-lg p-4 relative">
+                              {product.is_featured && (
+                                <Badge className="absolute top-2 right-2 bg-gold text-black">
+                                  <Star className="h-3 w-3 mr-1" />
+                                  Featured
+                                </Badge>
+                              )}
                               <div className="aspect-square bg-gray-700 rounded-lg mb-3 flex items-center justify-center">
-                                {product.images?.[0] ? (
+                                {product.product_images?.[0]?.url || product.images?.[0] || product.image_url ? (
                                   <img
-                                    src={product.images[0] || "/placeholder.svg"}
+                                    src={
+                                      product.product_images?.[0]?.url ||
+                                      product.images?.[0] ||
+                                      product.image_url ||
+                                      "/placeholder.svg"
+                                    }
                                     alt={product.name}
                                     className="w-full h-full object-cover rounded-lg"
                                   />
@@ -262,11 +587,112 @@ export function SimpleAdminDashboard() {
                               </div>
                               <h3 className="font-semibold text-white mb-1">{product.name || "Unnamed Product"}</h3>
                               <p className="text-gold font-bold">₦{(product.price || 0).toLocaleString()}</p>
-                              <p className="text-sm text-gray-400">{product.brand || "Unknown Brand"}</p>
+                              <p className="text-sm text-gray-400">
+                                {product.brands?.name || product.brand?.name || product.brand || "Unknown Brand"}
+                              </p>
+                              <div className="flex gap-2 mt-3">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleToggleFeatured(product.id, product.is_featured)}
+                                  className={`border-gold text-gold hover:bg-gold hover:text-black ${
+                                    product.is_featured ? "bg-gold text-black" : ""
+                                  }`}
+                                >
+                                  {product.is_featured ? <StarOff className="h-3 w-3" /> : <Star className="h-3 w-3" />}
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => setEditingProduct(product)}
+                                  className="flex-1 border-gray-700 text-gray-300 hover:bg-gray-700"
+                                >
+                                  <Edit className="h-3 w-3 mr-1" />
+                                  Edit
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleDeleteProduct(product.id)}
+                                  className="border-red-700 text-red-400 hover:bg-red-900/20"
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </div>
                             </div>
                           ))}
                       </div>
                     )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="featured" className="space-y-4">
+                <Card className="bg-gray-900 border-gray-800">
+                  <CardHeader>
+                    <CardTitle className="text-gold">Featured Products Management</CardTitle>
+                    <CardDescription className="text-gray-400">
+                      Manage products displayed in the Featured Timepieces section on your homepage
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {featuredProducts.length === 0 ? (
+                      <div className="text-center py-12">
+                        <Star className="h-16 w-16 text-gray-600 mx-auto mb-4" />
+                        <p className="text-gray-400 text-lg mb-2">No featured products yet</p>
+                        <p className="text-gray-500 text-sm mb-4">
+                          Go to Product Management and mark products as featured to display them here
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {featuredProducts.map((product) => (
+                          <div key={product.id} className="bg-gray-800 rounded-lg p-4 relative">
+                            <Badge className="absolute top-2 right-2 bg-gold text-black">
+                              <Star className="h-3 w-3 mr-1" />
+                              Featured
+                            </Badge>
+                            <div className="aspect-square bg-gray-700 rounded-lg mb-4 flex items-center justify-center overflow-hidden">
+                              {product.product_images?.[0]?.url ? (
+                                <img
+                                  src={product.product_images[0].url || "/placeholder.svg"}
+                                  alt={product.name}
+                                  className="w-full h-full object-cover rounded-lg"
+                                />
+                              ) : (
+                                <Eye className="h-12 w-12 text-gray-500" />
+                              )}
+                            </div>
+                            <div className="space-y-2">
+                              <h3 className="font-semibold text-white text-lg">{product.name}</h3>
+                              <p className="text-gold font-bold text-xl">₦{product.price.toLocaleString()}</p>
+                              <p className="text-sm text-gray-400">{product.brands?.name}</p>
+                              <p className="text-xs text-gray-500 line-clamp-2">{product.description}</p>
+                            </div>
+                            <div className="flex gap-2 mt-4">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleToggleFeatured(product.id, true)}
+                                className="flex-1 border-red-700 text-red-400 hover:bg-red-900/20"
+                              >
+                                <StarOff className="h-3 w-3 mr-1" />
+                                Remove Featured
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <div className="mt-6 p-4 bg-gray-800 rounded-lg">
+                      <h4 className="font-semibold text-white mb-2">How Featured Products Work</h4>
+                      <ul className="text-sm text-gray-400 space-y-1">
+                        <li>• Featured products appear in the "Featured Timepieces" section on your homepage</li>
+                        <li>• Only the first 3 featured products are displayed to maintain visual appeal</li>
+                        <li>• Changes made here instantly reflect on your live website</li>
+                        <li>• Use the star button in Product Management to add/remove featured status</li>
+                      </ul>
+                    </div>
                   </CardContent>
                 </Card>
               </TabsContent>
