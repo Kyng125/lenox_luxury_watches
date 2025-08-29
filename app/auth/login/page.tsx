@@ -9,15 +9,20 @@ export const metadata: Metadata = {
 }
 
 export default async function LoginPage() {
-  // Check if user is already logged in
-  const supabase = createClient()
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
+  try {
+    // Check if user is already logged in
+    const supabase = await createClient()
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
 
-  // If user is logged in, redirect to account page
-  if (session) {
-    redirect("/account")
+    // If user is logged in, redirect to account page
+    if (session) {
+      redirect("/account")
+    }
+  } catch (error) {
+    // Handle auth errors gracefully during SSR
+    console.error("Auth check failed:", error)
   }
 
   return (
