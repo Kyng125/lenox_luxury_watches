@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { CheckCircle, Package, Truck, Mail } from "lucide-react"
+import { Footer } from "@/components/footer"
 import Link from "next/link"
 
 export function CheckoutSuccessPage() {
@@ -129,6 +130,7 @@ export function CheckoutSuccessPage() {
           </div>
         </div>
       </div>
+      <Footer />
     </div>
   )
 }

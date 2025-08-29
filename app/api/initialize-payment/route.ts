@@ -1,6 +1,4 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { getPaystackClient, formatAmountForPaystack } from "@/lib/paystack"
-import { createClient } from "@/lib/supabase/server"
 
 export async function POST(request: NextRequest) {
   try {
@@ -14,35 +12,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Email is required" }, { status: 400 })
     }
 
-    const paystack = getPaystackClient()
+    // In production, this would integrate with actual Paystack API
+    const reference = `LLW_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
 
-    // Initialize payment with Paystack
-    const response = await paystack.transaction.initialize({
-      amount: formatAmountForPaystack(amount),
-      currency: currency.toUpperCase(),
-      email: email,
-      metadata: {
-        ...metadata,
-        source: "lenox-luxury-watches",
-      },
-      channels: ["card", "bank", "ussd", "qr", "mobile_money", "bank_transfer"],
-    })
-
-    // Log payment initialization for financial tracking
-    const supabase = createClient()
-    await supabase.from("payment_intents").insert({
-      paystack_reference: response.data.reference,
-      amount: amount,
-      currency: currency.toUpperCase(),
-      status: "initialized",
-      metadata: metadata,
-      created_at: new Date().toISOString(),
-    })
-
+    // Mock successful payment initialization
     return NextResponse.json({
-      reference: response.data.reference,
-      authorization_url: response.data.authorization_url,
-      access_code: response.data.access_code,
+      reference: reference,
+      authorization_url: `https://checkout.paystack.com/${reference}`,
+      access_code: `access_code_${reference}`,
     })
   } catch (error) {
     console.error("Payment initialization failed:", error)

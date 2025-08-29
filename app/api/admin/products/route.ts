@@ -1,71 +1,61 @@
 import { type NextRequest, NextResponse } from "next/server"
-
-// Mock data - in production, this would use Prisma
-const mockProducts = [
-  {
-    id: "1",
-    name: "Submariner Date",
-    slug: "submariner-date",
-    description: "The Rolex Submariner Date is a legendary diving watch.",
-    price: 8950.0,
-    salePrice: null,
-    sku: "ROL-SUB-001",
-    stock: 3,
-    categoryId: "cat_luxury_swiss",
-    brandId: "brand_rolex",
-    isActive: true,
-    isFeatured: true,
-    images: [{ url: "/rolex-submariner.png", alt: "Rolex Submariner", isPrimary: true }],
-    specifications: [
-      { name: "Case Material", value: "Stainless Steel" },
-      { name: "Movement", value: "Automatic" },
-      { name: "Water Resistance", value: "300m" },
-    ],
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-]
+import { createClient } from "@/lib/supabase/server"
 
 export async function GET(request: NextRequest) {
   try {
+    const supabase = await createClient()
     const { searchParams } = new URL(request.url)
+
+    // Get query parameters
     const page = Number.parseInt(searchParams.get("page") || "1")
     const limit = Number.parseInt(searchParams.get("limit") || "10")
     const search = searchParams.get("search") || ""
     const category = searchParams.get("category") || ""
     const brand = searchParams.get("brand") || ""
 
-    // Filter products based on search params
-    let filteredProducts = mockProducts
+    let query = supabase.from("products").select(`
+        *,
+        brands(id, name, description),
+        categories(id, name, description),
+        product_images(id, url, alt_text, is_primary, sort_order)
+      `)
 
+    // Apply filters
     if (search) {
-      filteredProducts = filteredProducts.filter(
-        (product) =>
-          product.name.toLowerCase().includes(search.toLowerCase()) ||
-          product.sku.toLowerCase().includes(search.toLowerCase()),
-      )
+      query = query.or(`name.ilike.%${search}%,sku.ilike.%${search}%,description.ilike.%${search}%`)
     }
 
     if (category) {
-      filteredProducts = filteredProducts.filter((product) => product.categoryId === category)
+      query = query.eq("category_id", category)
     }
 
     if (brand) {
-      filteredProducts = filteredProducts.filter((product) => product.brandId === brand)
+      query = query.eq("brand_id", brand)
     }
 
-    // Pagination
-    const startIndex = (page - 1) * limit
-    const endIndex = startIndex + limit
-    const paginatedProducts = filteredProducts.slice(startIndex, endIndex)
+    // Apply sorting and pagination
+    query = query.order("created_at", { ascending: false })
+    const from = (page - 1) * limit
+    const to = from + limit - 1
+    query = query.range(from, to)
+
+    const { data: products, error, count } = await query
+
+    if (error) {
+      console.error("Error fetching products:", error)
+      return NextResponse.json({ error: "Failed to fetch products" }, { status: 500 })
+    }
+
+    // Get total count for pagination
+    const { count: totalCount } = await supabase.from("products").select("*", { count: "exact", head: true })
 
     return NextResponse.json({
-      products: paginatedProducts,
+      products: products || [],
       pagination: {
         page,
         limit,
-        total: filteredProducts.length,
-        pages: Math.ceil(filteredProducts.length / limit),
+        total: totalCount || 0,
+        pages: Math.ceil((totalCount || 0) / limit),
       },
     })
   } catch (error) {
@@ -76,31 +66,63 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const supabase = await createClient()
     const body = await request.json()
 
     // Validate required fields
-    const requiredFields = ["name", "price", "sku", "categoryId", "brandId"]
+    const requiredFields = ["name", "price", "sku", "category_id", "brand_id"]
     for (const field of requiredFields) {
       if (!body[field]) {
         return NextResponse.json({ error: `${field} is required` }, { status: 400 })
       }
     }
 
-    // Create new product
-    const newProduct = {
-      id: Date.now().toString(),
-      ...body,
+    const productData = {
+      name: body.name,
+      description: body.description || "",
       price: Number.parseFloat(body.price),
-      salePrice: body.salePrice ? Number.parseFloat(body.salePrice) : null,
-      stock: Number.parseInt(body.stock),
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      sale_price: body.sale_price ? Number.parseFloat(body.sale_price) : null,
+      sku: body.sku,
+      stock_quantity: Number.parseInt(body.stock_quantity || "0"),
+      category_id: body.category_id,
+      brand_id: body.brand_id,
+      is_active: body.is_active !== false,
+      is_featured: body.is_featured || false,
+      specifications: body.specifications || {},
+      dimensions: body.dimensions || {},
+      weight: body.weight ? Number.parseFloat(body.weight) : null,
     }
 
-    // In production, save to database using Prisma
-    mockProducts.push(newProduct)
+    const { data: product, error } = await supabase
+      .from("products")
+      .insert(productData)
+      .select(`
+        *,
+        brands(id, name, description),
+        categories(id, name, description)
+      `)
+      .single()
 
-    return NextResponse.json(newProduct, { status: 201 })
+    if (error) {
+      console.error("Error creating product:", error)
+      return NextResponse.json({ error: "Failed to create product" }, { status: 500 })
+    }
+
+    if (body.images && Array.isArray(body.images)) {
+      const imagePromises = body.images.map((image: any, index: number) =>
+        supabase.from("product_images").insert({
+          product_id: product.id,
+          url: image.url,
+          alt_text: image.alt_text || product.name,
+          is_primary: index === 0 || image.is_primary,
+          sort_order: index,
+        }),
+      )
+
+      await Promise.all(imagePromises)
+    }
+
+    return NextResponse.json(product, { status: 201 })
   } catch (error) {
     console.error("Error creating product:", error)
     return NextResponse.json({ error: "Failed to create product" }, { status: 500 })

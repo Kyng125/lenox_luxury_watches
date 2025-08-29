@@ -10,11 +10,8 @@ import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { User, Package, Settings, LogOut, Edit } from "lucide-react"
 import { signOut } from "@/lib/auth-actions"
+import { Footer } from "@/components/footer"
 import type { User as SupabaseUser } from "@supabase/supabase-js"
-
-interface AccountPageProps {
-  user: SupabaseUser
-}
 
 // Mock order data - in real app this would come from database
 const mockOrders = [
@@ -49,6 +46,10 @@ const mockOrders = [
     ],
   },
 ]
+
+interface AccountPageProps {
+  user: SupabaseUser
+}
 
 export function AccountPage({ user }: AccountPageProps) {
   const [isEditing, setIsEditing] = useState(false)
@@ -362,6 +363,7 @@ export function AccountPage({ user }: AccountPageProps) {
           </TabsContent>
         </Tabs>
       </div>
+      <Footer />
     </div>
   )
 }

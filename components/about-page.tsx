@@ -12,27 +12,6 @@ const stats = [
   { icon: Shield, label: "Warranty Coverage", value: "Lifetime" },
 ]
 
-const team = [
-  {
-    name: "Marcus Lenox",
-    role: "Founder & CEO",
-    image: "/placeholder.svg?height=300&width=300",
-    bio: "With over 30 years in luxury timepieces, Marcus founded Lenox to bring the world's finest watches to discerning collectors.",
-  },
-  {
-    name: "Isabella Chen",
-    role: "Master Horologist",
-    image: "/placeholder.svg?height=300&width=300",
-    bio: "Isabella oversees our authentication and restoration services, ensuring every timepiece meets our exacting standards.",
-  },
-  {
-    name: "James Morrison",
-    role: "Curator of Collections",
-    image: "/placeholder.svg?height=300&width=300",
-    bio: "James travels the world sourcing rare and exceptional timepieces for our exclusive collections.",
-  },
-]
-
 export function AboutPage() {
   return (
     <div className="min-h-screen bg-black text-white">
@@ -118,30 +97,6 @@ export function AboutPage() {
                 timepieces.
               </p>
             </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Team Section */}
-      <section className="py-16 px-4 bg-gray-900">
-        <div className="container mx-auto">
-          <h2 className="font-serif text-4xl font-bold text-center mb-12 gold-gradient">Meet Our Team</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {team.map((member, index) => (
-              <div key={index} className="text-center">
-                <div className="relative w-48 h-48 mx-auto mb-6">
-                  <Image
-                    src={member.image || "/placeholder.svg"}
-                    alt={member.name}
-                    fill
-                    className="rounded-full object-cover"
-                  />
-                </div>
-                <h3 className="font-serif text-xl font-bold mb-2 gold-gradient">{member.name}</h3>
-                <p className="text-yellow-400 font-semibold mb-4">{member.role}</p>
-                <p className="text-gray-300">{member.bio}</p>
-              </div>
-            ))}
           </div>
         </div>
       </section>

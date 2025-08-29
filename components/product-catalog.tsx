@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -15,84 +15,30 @@ import { useCart } from "@/contexts/cart-context"
 import { useCurrency } from "@/contexts/currency-context"
 import Link from "next/link"
 
-// Mock data - in a real app, this would come from your database
-const watches = [
-  {
-    id: "prod_submariner",
-    name: "Submariner Date",
-    brand: "Rolex",
-    price: 13150,
-    salePrice: null,
-    image: "/luxury-watch.png",
-    category: "Luxury Swiss",
-    isFeatured: true,
-    stock: 5,
-    description: "The Rolex Submariner Date is a legendary diving watch, waterproof to 300 metres.",
-  },
-  {
-    id: "prod_speedmaster",
-    name: "Speedmaster Professional",
-    brand: "Omega",
-    price: 6350,
-    salePrice: null,
-    image: "/omega-speedmaster-moonwatch.png",
-    category: "Vintage Classic",
-    isFeatured: true,
-    stock: 8,
-    description: "The legendary Omega Speedmaster Professional - the first watch worn on the moon.",
-  },
-  {
-    id: "prod_nautilus",
-    name: "Nautilus 5711/1A",
-    brand: "Patek Philippe",
-    price: 34890,
-    salePrice: null,
-    image: "/patek-nautilus-blue.png",
-    category: "Luxury Swiss",
-    isFeatured: true,
-    stock: 2,
-    description: "The iconic Patek Philippe Nautilus with its distinctive porthole design.",
-  },
-  {
-    id: "prod_santos",
-    name: "Santos de Cartier",
-    brand: "Cartier",
-    price: 7150,
-    salePrice: 6435,
-    image: "/placeholder-tszr5.png",
-    category: "Dress & Formal",
-    isFeatured: false,
-    stock: 6,
-    description: "The Santos de Cartier watch, a pioneer among modern timepieces.",
-  },
-  {
-    id: "prod_navitimer",
-    name: "Navitimer B01",
-    brand: "Breitling",
-    price: 8600,
-    salePrice: null,
-    image: "/breitling-navitimer-chronograph.png",
-    category: "Modern Sport",
-    isFeatured: false,
-    stock: 4,
-    description: "The Breitling Navitimer B01 with its iconic circular slide rule.",
-  },
-  {
-    id: "prod_datejust",
-    name: "Datejust 36",
-    brand: "Rolex",
-    price: 8550,
-    salePrice: null,
-    image: "/luxury-wristwatch.png",
-    category: "Dress & Formal",
-    isFeatured: false,
-    stock: 7,
-    description: "The Rolex Datejust 36 - a timeless classic with modern refinements.",
-  },
-]
+interface Product {
+  id: string
+  name: string
+  description: string
+  price: number
+  sale_price?: number
+  sku: string
+  stock_quantity: number
+  is_featured: boolean
+  brands: { name: string }
+  categories: { name: string }
+  product_images: Array<{ url: string; is_primary: boolean }>
+}
 
-const brands = ["All Brands", "Rolex", "Omega", "Patek Philippe", "Cartier", "Breitling"]
-const categories = ["All Categories", "Luxury Swiss", "Vintage Classic", "Modern Sport", "Dress & Formal"]
+interface Brand {
+  id: string
+  name: string
+}
+
+interface Category {
+  id: string
+  name: string
+}
+
 const priceRanges = [
   { label: "All Prices", min: 0, max: Number.POSITIVE_INFINITY },
   { label: "Under $10,000", min: 0, max: 10000 },
@@ -105,6 +51,12 @@ export function ProductCatalog() {
   const { formatPrice, convertPrice } = useCurrency()
   const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlist()
   const { addItem } = useCart()
+
+  const [products, setProducts] = useState<Product[]>([])
+  const [brands, setBrands] = useState<Brand[]>([])
+  const [categories, setCategories] = useState<Category[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedBrand, setSelectedBrand] = useState("All Brands")
   const [selectedCategory, setSelectedCategory] = useState("All Categories")
@@ -113,66 +65,105 @@ export function ProductCatalog() {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
   const [showFilters, setShowFilters] = useState(false)
   const [onlyInStock, setOnlyInStock] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
 
-  const filteredAndSortedWatches = useMemo(() => {
-    const filtered = watches.filter((watch) => {
+  useEffect(() => {
+    loadData()
+  }, [])
+
+  const loadData = async () => {
+    try {
+      const [productsRes, brandsRes, categoriesRes] = await Promise.all([
+        fetch("/api/products?limit=50"),
+        fetch("/api/brands"),
+        fetch("/api/categories"),
+      ])
+
+      if (productsRes.ok) {
+        const productsData = await productsRes.json()
+        setProducts(productsData.products || [])
+      }
+
+      if (brandsRes.ok) {
+        const brandsData = await brandsRes.json()
+        setBrands(brandsData.brands || [])
+      }
+
+      if (categoriesRes.ok) {
+        const categoriesData = await categoriesRes.json()
+        setCategories(categoriesData.categories || [])
+      }
+    } catch (error) {
+      console.error("Error loading data:", error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const filteredAndSortedProducts = useMemo(() => {
+    const filtered = products.filter((product) => {
       const matchesSearch =
-        watch.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        watch.brand.toLowerCase().includes(searchQuery.toLowerCase())
-      const matchesBrand = selectedBrand === "All Brands" || watch.brand === selectedBrand
-      const matchesCategory = selectedCategory === "All Categories" || watch.category === selectedCategory
-      const currentPrice = watch.salePrice || watch.price
+        product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        product.brands?.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        product.description.toLowerCase().includes(searchQuery.toLowerCase())
+
+      const matchesBrand = selectedBrand === "All Brands" || product.brands?.name === selectedBrand
+      const matchesCategory = selectedCategory === "All Categories" || product.categories?.name === selectedCategory
+
+      const currentPrice = product.sale_price || product.price
       const matchesPrice = currentPrice >= selectedPriceRange.min && currentPrice <= selectedPriceRange.max
-      const matchesStock = !onlyInStock || watch.stock > 0
+      const matchesStock = !onlyInStock || product.stock_quantity > 0
 
       return matchesSearch && matchesBrand && matchesCategory && matchesPrice && matchesStock
     })
 
-    // Sort watches
+    // Sort products
     filtered.sort((a, b) => {
       switch (sortBy) {
         case "price-low":
-          return (a.salePrice || a.price) - (b.salePrice || b.price)
+          return (a.sale_price || a.price) - (b.sale_price || b.price)
         case "price-high":
-          return (b.salePrice || b.price) - (a.salePrice || a.price)
+          return (b.sale_price || b.price) - (a.sale_price || a.price)
         case "name":
           return a.name.localeCompare(b.name)
         case "brand":
-          return a.brand.localeCompare(b.brand)
+          return (a.brands?.name || "").localeCompare(b.brands?.name || "")
         case "featured":
         default:
-          return b.isFeatured ? 1 : -1
+          return b.is_featured ? 1 : -1
       }
     })
 
     return filtered
-  }, [searchQuery, selectedBrand, selectedCategory, selectedPriceRange, sortBy, onlyInStock])
+  }, [products, searchQuery, selectedBrand, selectedCategory, selectedPriceRange, sortBy, onlyInStock])
 
-  const handleWishlistToggle = (watch: any) => {
-    if (isInWishlist(watch.id)) {
-      removeFromWishlist(watch.id)
+  const handleWishlistToggle = (product: Product) => {
+    const primaryImage = product.product_images?.find((img) => img.is_primary)?.url || product.product_images?.[0]?.url
+
+    if (isInWishlist(product.id)) {
+      removeFromWishlist(product.id)
     } else {
       addToWishlist({
-        id: watch.id,
-        name: watch.name,
-        brand: watch.brand,
-        price: watch.price,
-        salePrice: watch.salePrice,
-        image: watch.image,
+        id: product.id,
+        name: product.name,
+        brand: product.brands?.name || "",
+        price: product.price,
+        salePrice: product.sale_price || null,
+        image: primaryImage || "/placeholder.svg",
       })
     }
   }
 
-  const handleAddToCart = (watch: any) => {
+  const handleAddToCart = (product: Product) => {
+    const primaryImage = product.product_images?.find((img) => img.is_primary)?.url || product.product_images?.[0]?.url
+
     addItem({
-      id: watch.id,
-      name: watch.name,
-      brand: watch.brand,
-      price: watch.price,
-      salePrice: watch.salePrice,
-      image: watch.image,
-      sku: `SKU-${watch.id}`,
+      id: product.id,
+      name: product.name,
+      brand: product.brands?.name || "",
+      price: product.price,
+      salePrice: product.sale_price || null,
+      image: primaryImage || "/placeholder.svg",
+      sku: product.sku,
     })
   }
 
@@ -247,9 +238,10 @@ export function ProductCatalog() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="All Brands">All Brands</SelectItem>
                     {brands.map((brand) => (
-                      <SelectItem key={brand} value={brand}>
-                        {brand}
+                      <SelectItem key={brand.id} value={brand.name}>
+                        {brand.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -263,9 +255,10 @@ export function ProductCatalog() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="All Categories">All Categories</SelectItem>
                     {categories.map((category) => (
-                      <SelectItem key={category} value={category}>
-                        {category}
+                      <SelectItem key={category.id} value={category.name}>
+                        {category.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -315,7 +308,7 @@ export function ProductCatalog() {
       {/* Results Count */}
       <div className="flex items-center justify-between">
         <p className="text-muted-foreground">
-          Showing {filteredAndSortedWatches.length} of {watches.length} watches
+          Showing {filteredAndSortedProducts.length} of {products.length} watches
         </p>
       </div>
 
@@ -336,163 +329,175 @@ export function ProductCatalog() {
         )
       ) : viewMode === "grid" ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {filteredAndSortedWatches.map((watch) => (
-            <Card
-              key={watch.id}
-              className="group bg-card border-border hover:border-primary/50 transition-all duration-300 luxury-shadow hover:watch-glow"
-            >
-              <CardContent className="p-0">
-                <div className="relative overflow-hidden">
-                  <img
-                    src={watch.image || "/placeholder.svg"}
-                    alt={`${watch.brand} ${watch.name}`}
-                    className="w-full h-64 object-cover group-hover:scale-105 transition-transform duration-500"
-                  />
-                  {watch.isFeatured && (
-                    <Badge className="absolute top-3 left-3 bg-primary text-primary-foreground">Featured</Badge>
-                  )}
-                  {watch.salePrice && <Badge className="absolute top-3 right-3 bg-red-600 text-white">Sale</Badge>}
-                  {watch.stock === 0 && (
-                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                      <Badge variant="secondary">Out of Stock</Badge>
-                    </div>
-                  )}
-                  <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Button
-                      size="icon"
-                      variant={isInWishlist(watch.id) ? "default" : "secondary"}
-                      className="h-8 w-8"
-                      onClick={() => handleWishlistToggle(watch)}
-                    >
-                      <Heart className={`h-4 w-4 ${isInWishlist(watch.id) ? "fill-current" : ""}`} />
-                    </Button>
-                  </div>
-                </div>
-                <div className="p-4">
-                  <div className="mb-2">
-                    <p className="text-sm text-primary font-semibold">{watch.brand}</p>
-                    <h3 className="font-serif text-lg font-semibold line-clamp-1">{watch.name}</h3>
-                  </div>
-                  <p className="text-sm text-muted-foreground mb-3 line-clamp-2">{watch.description}</p>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      {watch.salePrice ? (
-                        <>
-                          <span className="text-lg font-bold gold-gradient">
-                            {formatPrice(convertPrice(watch.salePrice))}
-                          </span>
-                          <span className="text-sm text-muted-foreground line-through">
-                            {formatPrice(convertPrice(watch.price))}
-                          </span>
-                        </>
-                      ) : (
-                        <span className="text-lg font-bold gold-gradient">
-                          {formatPrice(convertPrice(watch.price))}
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex gap-2">
-                      <Button
-                        asChild
-                        variant="outline"
-                        size="sm"
-                        className="border-primary text-primary hover:bg-primary hover:text-primary-foreground bg-transparent"
-                      >
-                        <Link href={`/watches/${watch.id}`}>View</Link>
-                      </Button>
-                      <Button
-                        size="sm"
-                        disabled={watch.stock === 0}
-                        className="bg-primary hover:bg-primary/90"
-                        onClick={() => handleAddToCart(watch)}
-                      >
-                        <ShoppingBag className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {filteredAndSortedWatches.map((watch) => (
-            <Card key={watch.id} className="bg-card border-border hover:border-primary/50 transition-colors">
-              <CardContent className="p-6">
-                <div className="flex flex-col md:flex-row gap-6">
-                  <div className="relative w-full md:w-48 h-48 flex-shrink-0">
+          {filteredAndSortedProducts.map((product) => {
+            const primaryImage =
+              product.product_images?.find((img) => img.is_primary)?.url || product.product_images?.[0]?.url
+
+            return (
+              <Card
+                key={product.id}
+                className="group bg-card border-border hover:border-primary/50 transition-all duration-300 luxury-shadow hover:watch-glow"
+              >
+                <CardContent className="p-0">
+                  <div className="relative overflow-hidden">
                     <img
-                      src={watch.image || "/placeholder.svg"}
-                      alt={`${watch.brand} ${watch.name}`}
-                      className="w-full h-full object-cover rounded-md"
+                      src={primaryImage || "/placeholder.svg"}
+                      alt={`${product.brands?.name} ${product.name}`}
+                      className="w-full h-64 object-cover group-hover:scale-105 transition-transform duration-500"
                     />
-                    {watch.isFeatured && (
-                      <Badge className="absolute top-2 left-2 bg-primary text-primary-foreground">Featured</Badge>
+                    {product.is_featured && (
+                      <Badge className="absolute top-3 left-3 bg-primary text-primary-foreground">Featured</Badge>
                     )}
-                    {watch.salePrice && <Badge className="absolute top-2 right-2 bg-red-600 text-white">Sale</Badge>}
-                  </div>
-                  <div className="flex-1 space-y-3">
-                    <div>
-                      <p className="text-sm text-primary font-semibold">{watch.brand}</p>
-                      <h3 className="font-serif text-xl font-semibold">{watch.name}</h3>
-                      <p className="text-muted-foreground">{watch.description}</p>
+                    {product.sale_price && <Badge className="absolute top-3 right-3 bg-red-600 text-white">Sale</Badge>}
+                    {product.stock_quantity === 0 && (
+                      <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                        <Badge variant="secondary">Out of Stock</Badge>
+                      </div>
+                    )}
+                    <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Button
+                        size="icon"
+                        variant={isInWishlist(product.id) ? "default" : "secondary"}
+                        className="h-8 w-8"
+                        onClick={() => handleWishlistToggle(product)}
+                      >
+                        <Heart className={`h-4 w-4 ${isInWishlist(product.id) ? "fill-current" : ""}`} />
+                      </Button>
                     </div>
+                  </div>
+                  <div className="p-4">
+                    <div className="mb-2">
+                      <p className="text-sm text-primary font-semibold">{product.brands?.name}</p>
+                      <h3 className="font-serif text-lg font-semibold line-clamp-1">{product.name}</h3>
+                    </div>
+                    <p className="text-sm text-muted-foreground mb-3 line-clamp-2">{product.description}</p>
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        {watch.salePrice ? (
+                      <div className="flex items-center gap-2">
+                        {product.sale_price ? (
                           <>
-                            <span className="text-2xl font-bold gold-gradient">
-                              {formatPrice(convertPrice(watch.salePrice))}
+                            <span className="text-lg font-bold gold-gradient">
+                              {formatPrice(convertPrice(product.sale_price))}
                             </span>
-                            <span className="text-lg text-muted-foreground line-through">
-                              {formatPrice(convertPrice(watch.price))}
+                            <span className="text-sm text-muted-foreground line-through">
+                              {formatPrice(convertPrice(product.price))}
                             </span>
                           </>
                         ) : (
-                          <span className="text-2xl font-bold gold-gradient">
-                            {formatPrice(convertPrice(watch.price))}
+                          <span className="text-lg font-bold gold-gradient">
+                            {formatPrice(convertPrice(product.price))}
                           </span>
                         )}
-                        <Badge variant="outline" className="border-border">
-                          {watch.stock > 0 ? `${watch.stock} in stock` : "Out of stock"}
-                        </Badge>
                       </div>
-                      <div className="flex gap-3">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleWishlistToggle(watch)}
-                          className={isInWishlist(watch.id) ? "text-red-500" : ""}
-                        >
-                          <Heart className={`h-4 w-4 ${isInWishlist(watch.id) ? "fill-current" : ""}`} />
-                        </Button>
+                      <div className="flex gap-2">
                         <Button
                           asChild
                           variant="outline"
+                          size="sm"
                           className="border-primary text-primary hover:bg-primary hover:text-primary-foreground bg-transparent"
                         >
-                          <Link href={`/watches/${watch.id}`}>View Details</Link>
+                          <Link href={`/watches/${product.id}`}>View</Link>
                         </Button>
                         <Button
-                          disabled={watch.stock === 0}
+                          size="sm"
+                          disabled={product.stock_quantity === 0}
                           className="bg-primary hover:bg-primary/90"
-                          onClick={() => handleAddToCart(watch)}
+                          onClick={() => handleAddToCart(product)}
                         >
-                          <ShoppingBag className="h-4 w-4 mr-2" />
-                          Add to Cart
+                          <ShoppingBag className="h-4 w-4" />
                         </Button>
                       </div>
                     </div>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                </CardContent>
+              </Card>
+            )
+          })}
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {filteredAndSortedProducts.map((product) => {
+            const primaryImage =
+              product.product_images?.find((img) => img.is_primary)?.url || product.product_images?.[0]?.url
+
+            return (
+              <Card key={product.id} className="bg-card border-border hover:border-primary/50 transition-colors">
+                <CardContent className="p-6">
+                  <div className="flex flex-col md:flex-row gap-6">
+                    <div className="relative w-full md:w-48 h-48 flex-shrink-0">
+                      <img
+                        src={primaryImage || "/placeholder.svg"}
+                        alt={`${product.brands?.name} ${product.name}`}
+                        className="w-full h-full object-cover rounded-md"
+                      />
+                      {product.is_featured && (
+                        <Badge className="absolute top-2 left-2 bg-primary text-primary-foreground">Featured</Badge>
+                      )}
+                      {product.sale_price && (
+                        <Badge className="absolute top-2 right-2 bg-red-600 text-white">Sale</Badge>
+                      )}
+                    </div>
+                    <div className="flex-1 space-y-3">
+                      <div>
+                        <p className="text-sm text-primary font-semibold">{product.brands?.name}</p>
+                        <h3 className="font-serif text-xl font-semibold">{product.name}</h3>
+                        <p className="text-muted-foreground">{product.description}</p>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          {product.sale_price ? (
+                            <>
+                              <span className="text-2xl font-bold gold-gradient">
+                                {formatPrice(convertPrice(product.sale_price))}
+                              </span>
+                              <span className="text-lg text-muted-foreground line-through">
+                                {formatPrice(convertPrice(product.price))}
+                              </span>
+                            </>
+                          ) : (
+                            <span className="text-2xl font-bold gold-gradient">
+                              {formatPrice(convertPrice(product.price))}
+                            </span>
+                          )}
+                          <Badge variant="outline" className="border-border">
+                            {product.stock_quantity > 0 ? `${product.stock_quantity} in stock` : "Out of stock"}
+                          </Badge>
+                        </div>
+                        <div className="flex gap-3">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleWishlistToggle(product)}
+                            className={isInWishlist(product.id) ? "text-red-500" : ""}
+                          >
+                            <Heart className={`h-4 w-4 ${isInWishlist(product.id) ? "fill-current" : ""}`} />
+                          </Button>
+                          <Button
+                            asChild
+                            variant="outline"
+                            className="border-primary text-primary hover:bg-primary hover:text-primary-foreground bg-transparent"
+                          >
+                            <Link href={`/watches/${product.id}`}>View Details</Link>
+                          </Button>
+                          <Button
+                            disabled={product.stock_quantity === 0}
+                            className="bg-primary hover:bg-primary/90"
+                            onClick={() => handleAddToCart(product)}
+                          >
+                            <ShoppingBag className="h-4 w-4 mr-2" />
+                            Add to Cart
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )
+          })}
         </div>
       )}
 
-      {filteredAndSortedWatches.length === 0 && !isLoading && (
+      {filteredAndSortedProducts.length === 0 && !isLoading && (
         <div className="text-center py-12">
           <p className="text-xl text-muted-foreground mb-4">No watches found matching your criteria</p>
           <Button

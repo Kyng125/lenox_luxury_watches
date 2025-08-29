@@ -1,5 +1,6 @@
 import type { Metadata } from "next"
 import { ContactPage } from "@/components/contact-page"
+import { Footer } from "@/components/footer"
 
 export const metadata: Metadata = {
   title: "Contact Us | Lenox Luxury Watches",
@@ -8,5 +9,10 @@ export const metadata: Metadata = {
 }
 
 export default function Contact() {
-  return <ContactPage />
+  return (
+    <div className="min-h-screen bg-black">
+      <ContactPage />
+      <Footer />
+    </div>
+  )
 }

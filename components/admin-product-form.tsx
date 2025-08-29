@@ -19,58 +19,62 @@ import { ImageUpload } from "./image-upload"
 
 interface ProductFormData {
   name: string
-  slug: string
   description: string
   price: string
-  salePrice: string
+  sale_price: string
   sku: string
-  stock: string
-  categoryId: string
-  brandId: string
-  isActive: boolean
-  isFeatured: boolean
+  stock_quantity: string
+  category_id: string
+  brand_id: string
+  is_active: boolean
+  is_featured: boolean
   images: string[]
   specifications: Array<{ name: string; value: string }>
+  dimensions: { length?: string; width?: string; height?: string }
+  weight: string
 }
 
 interface AdminProductFormProps {
   productId?: string
 }
 
-// Mock data for categories and brands
-const mockCategories = [
-  { id: "cat_luxury_swiss", name: "Luxury Swiss" },
-  { id: "cat_vintage_classic", name: "Vintage Classic" },
-  { id: "cat_modern_sport", name: "Modern Sport" },
-  { id: "cat_dress_formal", name: "Dress & Formal" },
-]
+interface Category {
+  id: string
+  name: string
+  description?: string
+}
 
-const mockBrands = [
-  { id: "brand_rolex", name: "Rolex" },
-  { id: "brand_omega", name: "Omega" },
-  { id: "brand_patek", name: "Patek Philippe" },
-  { id: "brand_cartier", name: "Cartier" },
-  { id: "brand_breitling", name: "Breitling" },
-]
+interface Brand {
+  id: string
+  name: string
+  description?: string
+}
 
 export function AdminProductForm({ productId }: AdminProductFormProps) {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
+  const [categories, setCategories] = useState<Category[]>([])
+  const [brands, setBrands] = useState<Brand[]>([])
   const [formData, setFormData] = useState<ProductFormData>({
     name: "",
-    slug: "",
     description: "",
     price: "",
-    salePrice: "",
+    sale_price: "",
     sku: "",
-    stock: "",
-    categoryId: "",
-    brandId: "",
-    isActive: true,
-    isFeatured: false,
+    stock_quantity: "",
+    category_id: "",
+    brand_id: "",
+    is_active: true,
+    is_featured: false,
     images: [],
     specifications: [{ name: "", value: "" }],
+    dimensions: {},
+    weight: "",
   })
+
+  useEffect(() => {
+    loadCategoriesAndBrands()
+  }, [])
 
   // Load product data if editing
   useEffect(() => {
@@ -79,25 +83,54 @@ export function AdminProductForm({ productId }: AdminProductFormProps) {
     }
   }, [productId])
 
+  const loadCategoriesAndBrands = async () => {
+    try {
+      // Load categories
+      const categoriesResponse = await fetch("/api/categories")
+      if (categoriesResponse.ok) {
+        const categoriesData = await categoriesResponse.json()
+        setCategories(categoriesData.categories || [])
+      }
+
+      // Load brands
+      const brandsResponse = await fetch("/api/brands")
+      if (brandsResponse.ok) {
+        const brandsData = await brandsResponse.json()
+        setBrands(brandsData.brands || [])
+      }
+    } catch (error) {
+      console.error("Error loading categories and brands:", error)
+      toast({
+        title: "Error",
+        description: "Failed to load categories and brands.",
+        variant: "destructive",
+      })
+    }
+  }
+
   const loadProduct = async (id: string) => {
     try {
       const response = await fetch(`/api/admin/products/${id}`)
       if (response.ok) {
         const product = await response.json()
         setFormData({
-          name: product.name,
-          slug: product.slug,
+          name: product.name || "",
           description: product.description || "",
-          price: product.price.toString(),
-          salePrice: product.salePrice?.toString() || "",
-          sku: product.sku,
-          stock: product.stock.toString(),
-          categoryId: product.categoryId,
-          brandId: product.brandId,
-          isActive: product.isActive,
-          isFeatured: product.isFeatured,
-          images: product.images?.map((img: any) => img.url) || [],
-          specifications: product.specifications || [{ name: "", value: "" }],
+          price: product.price?.toString() || "",
+          sale_price: product.sale_price?.toString() || "",
+          sku: product.sku || "",
+          stock_quantity: product.stock_quantity?.toString() || "",
+          category_id: product.category_id || "",
+          brand_id: product.brand_id || "",
+          is_active: product.is_active !== false,
+          is_featured: product.is_featured || false,
+          images: product.product_images?.map((img: any) => img.url) || [],
+          specifications: Object.entries(product.specifications || {}).map(([name, value]) => ({
+            name,
+            value: value as string,
+          })) || [{ name: "", value: "" }],
+          dimensions: product.dimensions || {},
+          weight: product.weight?.toString() || "",
         })
       }
     } catch (error) {
@@ -123,14 +156,6 @@ export function AdminProductForm({ productId }: AdminProductFormProps) {
       ...prev,
       [field]: value,
     }))
-
-    // Auto-generate slug when name changes
-    if (field === "name" && typeof value === "string") {
-      setFormData((prev) => ({
-        ...prev,
-        slug: generateSlug(value),
-      }))
-    }
   }
 
   const handleSpecificationChange = (index: number, field: string, value: string) => {
@@ -159,7 +184,7 @@ export function AdminProductForm({ productId }: AdminProductFormProps) {
 
     try {
       // Validate required fields
-      if (!formData.name || !formData.price || !formData.sku || !formData.categoryId || !formData.brandId) {
+      if (!formData.name || !formData.price || !formData.sku || !formData.category_id || !formData.brand_id) {
         toast({
           title: "Validation Error",
           description: "Please fill in all required fields.",
@@ -168,15 +193,17 @@ export function AdminProductForm({ productId }: AdminProductFormProps) {
         return
       }
 
-      // Prepare data for API
       const productData = {
         ...formData,
         images: formData.images.map((url, index) => ({
           url,
-          alt: `${formData.name} image ${index + 1}`,
-          isPrimary: index === 0,
+          alt_text: `${formData.name} image ${index + 1}`,
+          is_primary: index === 0,
+          sort_order: index,
         })),
-        specifications: formData.specifications.filter((spec) => spec.name && spec.value),
+        specifications: formData.specifications
+          .filter((spec) => spec.name && spec.value)
+          .reduce((acc, spec) => ({ ...acc, [spec.name]: spec.value }), {}),
       }
 
       const method = productId ? "PUT" : "POST"
@@ -191,7 +218,8 @@ export function AdminProductForm({ productId }: AdminProductFormProps) {
       })
 
       if (!response.ok) {
-        throw new Error("Failed to save product")
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Failed to save product")
       }
 
       toast({
@@ -199,11 +227,12 @@ export function AdminProductForm({ productId }: AdminProductFormProps) {
         description: `${formData.name} has been ${productId ? "updated" : "created"} successfully.`,
       })
 
-      router.push("/admin/products")
+      router.push("/dashboard")
     } catch (error) {
+      console.error("Save error:", error)
       toast({
         title: "Error",
-        description: "Failed to save product. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to save product. Please try again.",
         variant: "destructive",
       })
     } finally {
@@ -216,12 +245,12 @@ export function AdminProductForm({ productId }: AdminProductFormProps) {
       {/* Header Actions */}
       <div className="flex items-center justify-between">
         <Button asChild variant="ghost">
-          <Link href="/admin/products">
+          <Link href="/dashboard">
             <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Products
+            Back to Dashboard
           </Link>
         </Button>
-        <Button type="submit" disabled={isLoading} className="bg-primary hover:bg-primary/90">
+        <Button type="submit" disabled={isLoading} className="bg-yellow-600 hover:bg-yellow-700 text-black">
           <Save className="h-4 w-4 mr-2" />
           {isLoading ? "Saving..." : productId ? "Update Product" : "Create Product"}
         </Button>
@@ -230,50 +259,59 @@ export function AdminProductForm({ productId }: AdminProductFormProps) {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Main Product Information */}
         <div className="lg:col-span-2 space-y-6">
-          <Card className="bg-card border-border">
+          <Card className="bg-black border-yellow-600/20">
             <CardHeader>
-              <CardTitle className="font-serif">Product Information</CardTitle>
+              <CardTitle className="font-serif text-yellow-600">Product Information</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="name">Product Name *</Label>
+                  <Label htmlFor="name" className="text-gray-300">
+                    Product Name *
+                  </Label>
                   <Input
                     id="name"
                     value={formData.name}
                     onChange={(e) => handleInputChange("name", e.target.value)}
                     placeholder="e.g., Submariner Date"
-                    className="bg-background border-border"
+                    className="bg-gray-900 border-gray-700 text-white"
                     required
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="slug">URL Slug</Label>
+                  <Label htmlFor="sku" className="text-gray-300">
+                    SKU *
+                  </Label>
                   <Input
-                    id="slug"
-                    value={formData.slug}
-                    onChange={(e) => handleInputChange("slug", e.target.value)}
-                    placeholder="auto-generated"
-                    className="bg-background border-border"
+                    id="sku"
+                    value={formData.sku}
+                    onChange={(e) => handleInputChange("sku", e.target.value)}
+                    placeholder="e.g., ROL-SUB-001"
+                    className="bg-gray-900 border-gray-700 text-white"
+                    required
                   />
                 </div>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="description">Description</Label>
+                <Label htmlFor="description" className="text-gray-300">
+                  Description
+                </Label>
                 <Textarea
                   id="description"
                   value={formData.description}
                   onChange={(e) => handleInputChange("description", e.target.value)}
                   placeholder="Detailed product description..."
                   rows={4}
-                  className="bg-background border-border"
+                  className="bg-gray-900 border-gray-700 text-white"
                 />
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="price">Price ($) *</Label>
+                  <Label htmlFor="price" className="text-gray-300">
+                    Price ($) *
+                  </Label>
                   <Input
                     id="price"
                     type="number"
@@ -281,31 +319,35 @@ export function AdminProductForm({ productId }: AdminProductFormProps) {
                     value={formData.price}
                     onChange={(e) => handleInputChange("price", e.target.value)}
                     placeholder="0.00"
-                    className="bg-background border-border"
+                    className="bg-gray-900 border-gray-700 text-white"
                     required
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="salePrice">Sale Price ($)</Label>
+                  <Label htmlFor="sale_price" className="text-gray-300">
+                    Sale Price ($)
+                  </Label>
                   <Input
-                    id="salePrice"
+                    id="sale_price"
                     type="number"
                     step="0.01"
-                    value={formData.salePrice}
-                    onChange={(e) => handleInputChange("salePrice", e.target.value)}
+                    value={formData.sale_price}
+                    onChange={(e) => handleInputChange("sale_price", e.target.value)}
                     placeholder="0.00"
-                    className="bg-background border-border"
+                    className="bg-gray-900 border-gray-700 text-white"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="stock">Stock Quantity *</Label>
+                  <Label htmlFor="stock_quantity" className="text-gray-300">
+                    Stock Quantity *
+                  </Label>
                   <Input
-                    id="stock"
+                    id="stock_quantity"
                     type="number"
-                    value={formData.stock}
-                    onChange={(e) => handleInputChange("stock", e.target.value)}
+                    value={formData.stock_quantity}
+                    onChange={(e) => handleInputChange("stock_quantity", e.target.value)}
                     placeholder="0"
-                    className="bg-background border-border"
+                    className="bg-gray-900 border-gray-700 text-white"
                     required
                   />
                 </div>
@@ -313,54 +355,49 @@ export function AdminProductForm({ productId }: AdminProductFormProps) {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="sku">SKU *</Label>
-                  <Input
-                    id="sku"
-                    value={formData.sku}
-                    onChange={(e) => handleInputChange("sku", e.target.value)}
-                    placeholder="e.g., ROL-SUB-001"
-                    className="bg-background border-border"
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="category">Category *</Label>
-                  <Select value={formData.categoryId} onValueChange={(value) => handleInputChange("categoryId", value)}>
-                    <SelectTrigger className="bg-background border-border">
+                  <Label htmlFor="category" className="text-gray-300">
+                    Category *
+                  </Label>
+                  <Select
+                    value={formData.category_id}
+                    onValueChange={(value) => handleInputChange("category_id", value)}
+                  >
+                    <SelectTrigger className="bg-gray-900 border-gray-700 text-white">
                       <SelectValue placeholder="Select category" />
                     </SelectTrigger>
-                    <SelectContent>
-                      {mockCategories.map((category) => (
-                        <SelectItem key={category.id} value={category.id}>
+                    <SelectContent className="bg-gray-900 border-gray-700">
+                      {categories.map((category) => (
+                        <SelectItem key={category.id} value={category.id} className="text-white">
                           {category.name}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="brand">Brand *</Label>
-                <Select value={formData.brandId} onValueChange={(value) => handleInputChange("brandId", value)}>
-                  <SelectTrigger className="bg-background border-border">
-                    <SelectValue placeholder="Select brand" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {mockBrands.map((brand) => (
-                      <SelectItem key={brand.id} value={brand.id}>
-                        {brand.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="space-y-2">
+                  <Label htmlFor="brand" className="text-gray-300">
+                    Brand *
+                  </Label>
+                  <Select value={formData.brand_id} onValueChange={(value) => handleInputChange("brand_id", value)}>
+                    <SelectTrigger className="bg-gray-900 border-gray-700 text-white">
+                      <SelectValue placeholder="Select brand" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-gray-900 border-gray-700">
+                      {brands.map((brand) => (
+                        <SelectItem key={brand.id} value={brand.id} className="text-white">
+                          {brand.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="bg-card border-border">
+          <Card className="bg-black border-yellow-600/20">
             <CardHeader>
-              <CardTitle className="font-serif">Product Images</CardTitle>
+              <CardTitle className="font-serif text-yellow-600">Product Images</CardTitle>
             </CardHeader>
             <CardContent>
               <ImageUpload
@@ -372,29 +409,29 @@ export function AdminProductForm({ productId }: AdminProductFormProps) {
           </Card>
 
           {/* Product Specifications */}
-          <Card className="bg-card border-border">
+          <Card className="bg-black border-yellow-600/20">
             <CardHeader>
-              <CardTitle className="font-serif">Specifications</CardTitle>
+              <CardTitle className="font-serif text-yellow-600">Specifications</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               {formData.specifications.map((spec, index) => (
                 <div key={index} className="flex gap-3 items-end">
                   <div className="flex-1 space-y-2">
-                    <Label>Specification Name</Label>
+                    <Label className="text-gray-300">Specification Name</Label>
                     <Input
                       value={spec.name}
                       onChange={(e) => handleSpecificationChange(index, "name", e.target.value)}
                       placeholder="e.g., Case Material"
-                      className="bg-background border-border"
+                      className="bg-gray-900 border-gray-700 text-white"
                     />
                   </div>
                   <div className="flex-1 space-y-2">
-                    <Label>Value</Label>
+                    <Label className="text-gray-300">Value</Label>
                     <Input
                       value={spec.value}
                       onChange={(e) => handleSpecificationChange(index, "value", e.target.value)}
                       placeholder="e.g., Stainless Steel"
-                      className="bg-background border-border"
+                      className="bg-gray-900 border-gray-700 text-white"
                     />
                   </div>
                   {formData.specifications.length > 1 && (
@@ -403,7 +440,7 @@ export function AdminProductForm({ productId }: AdminProductFormProps) {
                       variant="ghost"
                       size="sm"
                       onClick={() => removeSpecification(index)}
-                      className="text-red-600 hover:text-red-700"
+                      className="text-red-400 hover:text-red-300"
                     >
                       <X className="h-4 w-4" />
                     </Button>
@@ -414,7 +451,7 @@ export function AdminProductForm({ productId }: AdminProductFormProps) {
                 type="button"
                 variant="outline"
                 onClick={addSpecification}
-                className="w-full border-border bg-transparent"
+                className="w-full border-gray-700 bg-transparent text-gray-300 hover:bg-gray-800"
               >
                 <Plus className="h-4 w-4 mr-2" />
                 Add Specification
@@ -425,46 +462,58 @@ export function AdminProductForm({ productId }: AdminProductFormProps) {
 
         {/* Sidebar */}
         <div className="space-y-6">
-          <Card className="bg-card border-border">
+          <Card className="bg-black border-yellow-600/20">
             <CardHeader>
-              <CardTitle className="font-serif">Product Status</CardTitle>
+              <CardTitle className="font-serif text-yellow-600">Product Status</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-center space-x-2">
                 <Checkbox
-                  id="isActive"
-                  checked={formData.isActive}
-                  onCheckedChange={(checked) => handleInputChange("isActive", checked)}
+                  id="is_active"
+                  checked={formData.is_active}
+                  onCheckedChange={(checked) => handleInputChange("is_active", checked)}
                 />
-                <Label htmlFor="isActive">Active Product</Label>
+                <Label htmlFor="is_active" className="text-gray-300">
+                  Active Product
+                </Label>
               </div>
               <div className="flex items-center space-x-2">
                 <Checkbox
-                  id="isFeatured"
-                  checked={formData.isFeatured}
-                  onCheckedChange={(checked) => handleInputChange("isFeatured", checked)}
+                  id="is_featured"
+                  checked={formData.is_featured}
+                  onCheckedChange={(checked) => handleInputChange("is_featured", checked)}
                 />
-                <Label htmlFor="isFeatured">Featured Product</Label>
+                <Label htmlFor="is_featured" className="text-gray-300">
+                  Featured Product
+                </Label>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="bg-card border-border">
+          <Card className="bg-black border-yellow-600/20">
             <CardHeader>
-              <CardTitle className="font-serif">Publishing</CardTitle>
+              <CardTitle className="font-serif text-yellow-600">Publishing</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="text-sm text-muted-foreground">
-                <p>Status: {formData.isActive ? "Active" : "Draft"}</p>
-                <p>Visibility: {formData.isFeatured ? "Featured" : "Standard"}</p>
+              <div className="text-sm text-gray-400">
+                <p>Status: {formData.is_active ? "Active" : "Draft"}</p>
+                <p>Visibility: {formData.is_featured ? "Featured" : "Standard"}</p>
               </div>
-              <Separator />
+              <Separator className="bg-gray-700" />
               <div className="space-y-2">
-                <Button type="submit" disabled={isLoading} className="w-full bg-primary hover:bg-primary/90">
+                <Button
+                  type="submit"
+                  disabled={isLoading}
+                  className="w-full bg-yellow-600 hover:bg-yellow-700 text-black"
+                >
                   {isLoading ? "Saving..." : productId ? "Update Product" : "Create Product"}
                 </Button>
-                <Button asChild variant="outline" className="w-full border-border bg-transparent">
-                  <Link href="/admin/products">Cancel</Link>
+                <Button
+                  asChild
+                  variant="outline"
+                  className="w-full border-gray-700 bg-transparent text-gray-300 hover:bg-gray-800"
+                >
+                  <Link href="/dashboard">Cancel</Link>
                 </Button>
               </div>
             </CardContent>

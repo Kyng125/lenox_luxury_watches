@@ -10,7 +10,7 @@ import { CartIcon } from "@/components/cart-icon"
 import { CurrencySelector } from "@/components/currency-selector"
 import { SearchModal } from "@/components/search-modal"
 import { useWishlist } from "@/contexts/wishlist-context"
-import { supabase } from "@/lib/supabase/client"
+import { createClient } from "@/lib/supabase/client"
 import type { User as SupabaseUser } from "@supabase/supabase-js"
 
 export function Header() {
@@ -18,6 +18,8 @@ export function Header() {
   const [isSearchOpen, setIsSearchOpen] = useState(false)
   const [user, setUser] = useState<SupabaseUser | null>(null)
   const { items: wishlistItems } = useWishlist()
+
+  const supabase = createClient()
 
   useEffect(() => {
     // Get initial session

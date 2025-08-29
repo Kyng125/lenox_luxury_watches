@@ -1,12 +1,29 @@
-import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
+import { updateSession } from "@/lib/supabase/middleware"
 
 export async function middleware(request: NextRequest) {
-  if (request.nextUrl.pathname.startsWith("/admin")) {
-    return NextResponse.next()
+  const supabaseResponse = await updateSession(request)
+
+  // Handle admin routes - these bypass Supabase auth for now
+  if (request.nextUrl.pathname.startsWith("/admin") || request.nextUrl.pathname.startsWith("/dashboard")) {
+    return supabaseResponse
   }
 
-  return NextResponse.next()
+  // Handle auth routes - allow access without authentication
+  if (request.nextUrl.pathname.startsWith("/auth/")) {
+    return supabaseResponse
+  }
+
+  // Handle protected routes that require authentication
+  if (
+    request.nextUrl.pathname.startsWith("/account") ||
+    request.nextUrl.pathname.startsWith("/orders") ||
+    request.nextUrl.pathname.startsWith("/wishlist")
+  ) {
+    return supabaseResponse
+  }
+
+  return supabaseResponse
 }
 
 export const config = {

@@ -2,6 +2,7 @@ import type { Metadata } from "next"
 import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import { AccountPage } from "@/components/account-page"
+import { Footer } from "@/components/footer"
 
 export const metadata: Metadata = {
   title: "My Account | Lenox Luxury Watches",
@@ -19,5 +20,10 @@ export default async function Account() {
     redirect("/auth/login")
   }
 
-  return <AccountPage user={user} />
+  return (
+    <div className="min-h-screen bg-black">
+      <AccountPage user={user} />
+      <Footer />
+    </div>
+  )
 }

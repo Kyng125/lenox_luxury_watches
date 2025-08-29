@@ -3,14 +3,14 @@ import { createClient } from "@/lib/supabase/server"
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
     const orderData = await request.json()
 
     const {
       items,
       billingAddress,
       shippingAddress,
-      paymentMethod,
+      paymentReference,
       subtotal,
       taxAmount,
       shippingAmount,
@@ -46,20 +46,19 @@ export async function POST(request: NextRequest) {
       userId = newUser.user?.id
     }
 
-    // Create order
     const { data: order, error: orderError } = await supabase
       .from("orders")
       .insert({
         user_id: userId || null,
         guest_email: !userId ? guestEmail : null,
         status: "pending",
-        subtotal,
+        subtotal_amount: subtotal,
         tax_amount: taxAmount,
         shipping_amount: shippingAmount,
         total_amount: totalAmount,
         billing_address: billingAddress,
-        shipping_address: shippingAddress,
-        payment_method: paymentMethod,
+        shipping_address: shippingAddress || billingAddress,
+        payment_reference: paymentReference,
         payment_status: "pending",
       })
       .select()
@@ -70,13 +69,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Failed to create order" }, { status: 500 })
     }
 
-    // Create order items
     const orderItems = items.map((item: any) => ({
       order_id: order.id,
-      product_id: item.productId,
+      product_id: item.id,
       quantity: item.quantity,
-      unit_price: item.price,
-      total_price: item.price * item.quantity,
+      unit_price: item.salePrice || item.price,
+      total_price: (item.salePrice || item.price) * item.quantity,
       product_snapshot: {
         name: item.name,
         brand: item.brand,
@@ -97,18 +95,20 @@ export async function POST(request: NextRequest) {
       await supabase.from("cart_items").delete().eq("user_id", userId)
     }
 
-    // Update order status to processing (simulate payment processing)
-    await supabase
+    const { data: updatedOrder } = await supabase
       .from("orders")
       .update({
         status: "processing",
         payment_status: "paid",
+        updated_at: new Date().toISOString(),
       })
       .eq("id", order.id)
+      .select()
+      .single()
 
     return NextResponse.json({
       success: true,
-      order: {
+      order: updatedOrder || {
         ...order,
         status: "processing",
         payment_status: "paid",
@@ -122,7 +122,7 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
 
     // Get user session
     const {
@@ -140,7 +140,9 @@ export async function GET(request: NextRequest) {
         order_items(
           *,
           products(
+            id,
             name,
+            sku,
             brands(name),
             product_images(url, alt_text, is_primary)
           )

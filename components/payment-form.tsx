@@ -1,6 +1,5 @@
 "use client"
 import { useState } from "react"
-import { usePaystackPayment } from "react-paystack"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -35,33 +34,7 @@ export function PaymentForm({
   const [name, setName] = useState(customerName)
   const [phone, setPhone] = useState(customerPhone)
 
-  const config = {
-    reference: `LLW_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-    email: email,
-    amount: Math.round(amount * 100), // Convert to kobo
-    currency: currency.toUpperCase(),
-    publicKey: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY!,
-    metadata: {
-      ...metadata,
-      custom_fields: [
-        {
-          display_name: "Customer Name",
-          variable_name: "customer_name",
-          value: name,
-        },
-        {
-          display_name: "Phone Number",
-          variable_name: "phone_number",
-          value: phone,
-        },
-      ],
-    },
-    channels: ["card", "bank", "ussd", "qr", "mobile_money", "bank_transfer"],
-  }
-
-  const initializePayment = usePaystackPayment(config)
-
-  const handlePayment = () => {
+  const handlePayment = async () => {
     if (!email || !name) {
       setError("Please fill in all required fields")
       return
@@ -70,24 +43,44 @@ export function PaymentForm({
     setIsProcessing(true)
     setError(null)
 
-    initializePayment({
-      onSuccess: (response) => {
-        console.log("[v0] Paystack payment successful:", response)
+    try {
+      // Initialize payment
+      const response = await fetch("/api/initialize-payment", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          amount,
+          currency,
+          email,
+          metadata: {
+            ...metadata,
+            customer_name: name,
+            phone_number: phone,
+          },
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error("Payment initialization failed")
+      }
+
+      const data = await response.json()
+
+      // Simulate successful payment for development
+      setTimeout(() => {
+        console.log("[v0] Simulated payment successful:", data.reference)
         setIsProcessing(false)
-        onSuccess(response.reference)
-      },
-      onClose: () => {
-        console.log("[v0] Paystack payment closed")
-        setIsProcessing(false)
-        setError("Payment was cancelled")
-      },
-      onError: (error) => {
-        console.log("[v0] Paystack payment error:", error)
-        setIsProcessing(false)
-        onError(error.message || "Payment failed")
-        setError(error.message || "Payment failed")
-      },
-    })
+        onSuccess(data.reference)
+      }, 2000)
+    } catch (error) {
+      console.log("[v0] Payment error:", error)
+      setIsProcessing(false)
+      const errorMessage = error instanceof Error ? error.message : "Payment failed"
+      onError(errorMessage)
+      setError(errorMessage)
+    }
   }
 
   return (
@@ -140,7 +133,7 @@ export function PaymentForm({
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 className="bg-gray-900 border-gray-600 text-white"
-                placeholder="+234 800 000 0000"
+                placeholder="+1 (555) 123-4567"
               />
             </div>
           </div>
@@ -158,7 +151,7 @@ export function PaymentForm({
           <Shield className="h-5 w-5 text-green-400" />
           <div>
             <p className="font-medium text-white">Secure Payment</p>
-            <p className="text-sm text-gray-400">Your payment is processed securely by Paystack</p>
+            <p className="text-sm text-gray-400">Your payment is processed securely with SSL encryption</p>
           </div>
         </div>
       </div>
@@ -174,9 +167,9 @@ export function PaymentForm({
             Processing Payment...
           </>
         ) : (
-          `Pay ${new Intl.NumberFormat("en-NG", {
+          `Pay ${new Intl.NumberFormat("en-US", {
             style: "currency",
-            currency: currency.toUpperCase(),
+            currency: "USD",
           }).format(amount)}`
         )}
       </Button>

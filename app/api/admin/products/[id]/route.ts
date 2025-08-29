@@ -1,36 +1,24 @@
 import { type NextRequest, NextResponse } from "next/server"
-
-// Mock data - same as above
-const mockProducts = [
-  {
-    id: "1",
-    name: "Submariner Date",
-    slug: "submariner-date",
-    description: "The Rolex Submariner Date is a legendary diving watch.",
-    price: 8950.0,
-    salePrice: null,
-    sku: "ROL-SUB-001",
-    stock: 3,
-    categoryId: "cat_luxury_swiss",
-    brandId: "brand_rolex",
-    isActive: true,
-    isFeatured: true,
-    images: [{ url: "/rolex-submariner.png", alt: "Rolex Submariner", isPrimary: true }],
-    specifications: [
-      { name: "Case Material", value: "Stainless Steel" },
-      { name: "Movement", value: "Automatic" },
-      { name: "Water Resistance", value: "300m" },
-    ],
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-]
+import { createClient } from "@/lib/supabase/server"
 
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const product = mockProducts.find((p) => p.id === params.id)
+    const supabase = await createClient()
+    const { id } = params
 
-    if (!product) {
+    const { data: product, error } = await supabase
+      .from("products")
+      .select(`
+        *,
+        brands(id, name, description, logo_url),
+        categories(id, name, description),
+        product_images(id, url, alt_text, is_primary, sort_order)
+      `)
+      .eq("id", id)
+      .single()
+
+    if (error) {
+      console.error("Error fetching product:", error)
       return NextResponse.json({ error: "Product not found" }, { status: 404 })
     }
 
@@ -43,26 +31,63 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 
 export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
   try {
+    const supabase = await createClient()
     const body = await request.json()
-    const productIndex = mockProducts.findIndex((p) => p.id === params.id)
+    const { id } = params
 
-    if (productIndex === -1) {
-      return NextResponse.json({ error: "Product not found" }, { status: 404 })
-    }
-
-    // Update product
-    const updatedProduct = {
-      ...mockProducts[productIndex],
-      ...body,
+    const updateData = {
+      name: body.name,
+      description: body.description,
       price: Number.parseFloat(body.price),
-      salePrice: body.salePrice ? Number.parseFloat(body.salePrice) : null,
-      stock: Number.parseInt(body.stock),
-      updatedAt: new Date().toISOString(),
+      sale_price: body.sale_price ? Number.parseFloat(body.sale_price) : null,
+      sku: body.sku,
+      stock_quantity: Number.parseInt(body.stock_quantity || "0"),
+      category_id: body.category_id,
+      brand_id: body.brand_id,
+      is_active: body.is_active,
+      is_featured: body.is_featured,
+      specifications: body.specifications || {},
+      dimensions: body.dimensions || {},
+      weight: body.weight ? Number.parseFloat(body.weight) : null,
+      updated_at: new Date().toISOString(),
     }
 
-    mockProducts[productIndex] = updatedProduct
+    const { data: product, error } = await supabase
+      .from("products")
+      .update(updateData)
+      .eq("id", id)
+      .select(`
+        *,
+        brands(id, name, description),
+        categories(id, name, description),
+        product_images(id, url, alt_text, is_primary, sort_order)
+      `)
+      .single()
 
-    return NextResponse.json(updatedProduct)
+    if (error) {
+      console.error("Error updating product:", error)
+      return NextResponse.json({ error: "Failed to update product" }, { status: 500 })
+    }
+
+    if (body.images && Array.isArray(body.images)) {
+      // Delete existing images
+      await supabase.from("product_images").delete().eq("product_id", id)
+
+      // Insert new images
+      const imagePromises = body.images.map((image: any, index: number) =>
+        supabase.from("product_images").insert({
+          product_id: id,
+          url: image.url,
+          alt_text: image.alt_text || product.name,
+          is_primary: index === 0 || image.is_primary,
+          sort_order: index,
+        }),
+      )
+
+      await Promise.all(imagePromises)
+    }
+
+    return NextResponse.json(product)
   } catch (error) {
     console.error("Error updating product:", error)
     return NextResponse.json({ error: "Failed to update product" }, { status: 500 })
@@ -71,14 +96,17 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
 
 export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const productIndex = mockProducts.findIndex((p) => p.id === params.id)
+    const supabase = await createClient()
+    const { id } = params
 
-    if (productIndex === -1) {
-      return NextResponse.json({ error: "Product not found" }, { status: 404 })
+    await supabase.from("product_images").delete().eq("product_id", id)
+
+    const { error } = await supabase.from("products").delete().eq("id", id)
+
+    if (error) {
+      console.error("Error deleting product:", error)
+      return NextResponse.json({ error: "Failed to delete product" }, { status: 500 })
     }
-
-    // Remove product
-    mockProducts.splice(productIndex, 1)
 
     return NextResponse.json({ success: true })
   } catch (error) {
