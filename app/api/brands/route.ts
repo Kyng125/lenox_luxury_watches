@@ -18,7 +18,7 @@ export async function GET() {
       return NextResponse.json({ error: "Failed to fetch brands" }, { status: 500 })
     }
 
-    return NextResponse.json({ brands: brands || [] })
+    return NextResponse.json(brands || [])
   } catch (error) {
     console.error("API Error:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
@@ -34,6 +34,12 @@ export async function POST(request: Request) {
 
     if (!name) {
       return NextResponse.json({ error: "Brand name is required" }, { status: 400 })
+    }
+
+    const { data: existingBrand } = await supabase.from("brands").select("id").eq("name", name).single()
+
+    if (existingBrand) {
+      return NextResponse.json({ error: "A brand with this name already exists" }, { status: 400 })
     }
 
     const { data: brand, error } = await supabase

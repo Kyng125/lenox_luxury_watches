@@ -18,7 +18,7 @@ export async function GET() {
       return NextResponse.json({ error: "Failed to fetch categories" }, { status: 500 })
     }
 
-    return NextResponse.json({ categories: categories || [] })
+    return NextResponse.json(categories || [])
   } catch (error) {
     console.error("API Error:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
@@ -34,6 +34,12 @@ export async function POST(request: Request) {
 
     if (!name) {
       return NextResponse.json({ error: "Category name is required" }, { status: 400 })
+    }
+
+    const { data: existingCategory } = await supabase.from("categories").select("id").eq("name", name).single()
+
+    if (existingCategory) {
+      return NextResponse.json({ error: "A category with this name already exists" }, { status: 400 })
     }
 
     const { data: category, error } = await supabase
