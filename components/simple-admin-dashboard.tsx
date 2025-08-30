@@ -101,79 +101,21 @@ export function SimpleAdminDashboard() {
     setFeaturedProducts([])
   }
 
-  const loadData = async () => {
-    setLoading(true)
-    try {
-      // Load products
-      const productsRes = await fetch("/api/products")
-      if (productsRes.ok) {
-        const productsData = await productsRes.json()
-        setProducts(
-          Array.isArray(productsData.products)
-            ? productsData.products
-            : Array.isArray(productsData)
-              ? productsData
-              : [],
-        )
-      }
-
-      // Load featured products
-      const featuredRes = await fetch("/api/products?featured=true")
-      if (featuredRes.ok) {
-        const featuredData = await featuredRes.json()
-        setFeaturedProducts(Array.isArray(featuredData.products) ? featuredData.products : [])
-      }
-
-      // Load orders
-      try {
-        const ordersRes = await fetch("/api/orders")
-        if (ordersRes.ok) {
-          const ordersData = await ordersRes.json()
-          setOrders(Array.isArray(ordersData) ? ordersData : [])
-        }
-      } catch (orderError) {
-        console.warn("Orders API error:", orderError)
-        setOrders([])
-      }
-
-      // Load categories
-      try {
-        const categoriesRes = await fetch("/api/categories")
-        if (categoriesRes.ok) {
-          const categoriesData = await categoriesRes.json()
-          console.log("[v0] Loaded categories:", categoriesData) // Added debugging
-          setCategories(Array.isArray(categoriesData) ? categoriesData : [])
-        }
-      } catch (error) {
-        console.warn("Categories API error:", error)
-        setCategories([])
-      }
-
-      // Load brands
-      try {
-        const brandsRes = await fetch("/api/brands")
-        if (brandsRes.ok) {
-          const brandsData = await brandsRes.json()
-          console.log("[v0] Loaded brands:", brandsData) // Added debugging
-          setBrands(Array.isArray(brandsData) ? brandsData : [])
-        }
-      } catch (error) {
-        console.warn("Brands API error:", error)
-        setBrands([])
-      }
-    } catch (error) {
-      console.error("Error loading data:", error)
-      setProducts([])
-      setOrders([])
-      setFeaturedProducts([])
-    } finally {
-      setLoading(false)
-    }
-  }
-
   const handleCreateBrand = async () => {
     try {
       console.log("[v0] Creating brand with data:", brandForm)
+
+      if (!brandForm.name.trim()) {
+        alert("Brand name is required")
+        return
+      }
+
+      // Check for duplicate brand name
+      const existingBrand = brands.find((b) => b.name.toLowerCase() === brandForm.name.toLowerCase())
+      if (existingBrand) {
+        alert("A brand with this name already exists. Please choose a different name.")
+        return
+      }
 
       const brandData = {
         name: brandForm.name,
@@ -200,7 +142,7 @@ export function SimpleAdminDashboard() {
           description: "",
           images: [],
         })
-        loadData()
+        await loadData()
         alert("Brand created successfully!")
       } else {
         const errorData = await response.json()
@@ -255,6 +197,18 @@ export function SimpleAdminDashboard() {
     try {
       console.log("[v0] Creating category with data:", categoryForm)
 
+      if (!categoryForm.name.trim()) {
+        alert("Category name is required")
+        return
+      }
+
+      // Check for duplicate category name
+      const existingCategory = categories.find((c) => c.name.toLowerCase() === categoryForm.name.toLowerCase())
+      if (existingCategory) {
+        alert("A category with this name already exists. Please choose a different name.")
+        return
+      }
+
       const categoryData = {
         name: categoryForm.name,
         description: categoryForm.description,
@@ -280,7 +234,7 @@ export function SimpleAdminDashboard() {
           description: "",
           images: [],
         })
-        loadData()
+        await loadData()
         alert("Category created successfully!")
       } else {
         const errorData = await response.json()
@@ -340,14 +294,40 @@ export function SimpleAdminDashboard() {
         return
       }
 
+      if (!productForm.name.trim()) {
+        alert("Product name is required")
+        return
+      }
+
+      if (!productForm.category_id) {
+        alert("Category is required")
+        return
+      }
+
+      if (!productForm.brand_id) {
+        alert("Brand is required")
+        return
+      }
+
+      if (!productForm.price || Number.parseFloat(productForm.price) <= 0) {
+        alert("Valid price is required")
+        return
+      }
+
+      const productData = {
+        ...productForm,
+        price: Number.parseFloat(productForm.price),
+        stock_quantity: Number.parseInt(productForm.stock_quantity) || 0,
+        category_id: Number.parseInt(productForm.category_id),
+        brand_id: Number.parseInt(productForm.brand_id),
+      }
+
+      console.log("[v0] Sending product data:", productData)
+
       const response = await fetch("/api/admin/products", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...productForm,
-          price: Number.parseFloat(productForm.price),
-          stock_quantity: Number.parseInt(productForm.stock_quantity) || 0,
-        }),
+        body: JSON.stringify(productData),
       })
 
       console.log("[v0] Product API response status:", response.status)
@@ -360,14 +340,14 @@ export function SimpleAdminDashboard() {
           name: "",
           description: "",
           price: "",
-          sku: "", // Reset SKU field
+          sku: "",
           brand_id: "",
           category_id: "",
           is_featured: false,
           stock_quantity: "",
           images: [],
         })
-        loadData()
+        await loadData()
         if (productForm.is_featured) {
           window.dispatchEvent(new CustomEvent("featuredProductsUpdated"))
         }
@@ -498,6 +478,54 @@ export function SimpleAdminDashboard() {
   const lowStockProducts = Array.isArray(products)
     ? products.filter((product) => (product.stock_quantity || 0) < 5).length
     : 0
+
+  const loadData = async () => {
+    try {
+      console.log("[v0] Loading dashboard data...")
+
+      const [productsRes, ordersRes, brandsRes, categoriesRes] = await Promise.all([
+        fetch("/api/admin/products"),
+        fetch("/api/orders"),
+        fetch("/api/brands"),
+        fetch("/api/categories"),
+      ])
+
+      console.log("[v0] API responses:", {
+        products: productsRes.status,
+        orders: ordersRes.status,
+        brands: brandsRes.status,
+        categories: categoriesRes.status,
+      })
+
+      if (productsRes.ok) {
+        const productsData = await productsRes.json()
+        console.log("[v0] Products loaded:", productsData.length)
+        setProducts(productsData)
+      }
+
+      if (ordersRes.ok) {
+        const ordersData = await ordersRes.json()
+        console.log("[v0] Orders loaded:", ordersData.length)
+        setOrders(ordersData)
+      }
+
+      if (brandsRes.ok) {
+        const brandsData = await brandsRes.json()
+        console.log("[v0] Brands loaded:", brandsData.length)
+        setBrands(brandsData)
+      }
+
+      if (categoriesRes.ok) {
+        const categoriesData = await categoriesRes.json()
+        console.log("[v0] Categories loaded:", categoriesData.length)
+        setCategories(categoriesData)
+      }
+
+      console.log("[v0] Dashboard data loading complete")
+    } catch (error) {
+      console.error("[v0] Error loading dashboard data:", error)
+    }
+  }
 
   return (
     <div className="min-h-screen bg-black text-white">
@@ -835,6 +863,7 @@ export function SimpleAdminDashboard() {
                                       product.product_images?.[0]?.url ||
                                       product.images?.[0] ||
                                       product.image_url ||
+                                      "/placeholder.svg" ||
                                       "/placeholder.svg" ||
                                       "/placeholder.svg" ||
                                       "/placeholder.svg" ||
