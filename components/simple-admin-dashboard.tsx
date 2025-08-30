@@ -65,6 +65,7 @@ export function SimpleAdminDashboard() {
     name: "",
     description: "",
     price: "",
+    sku: "", // Added missing SKU field
     brand_id: "",
     category_id: "",
     is_featured: false,
@@ -140,6 +141,7 @@ export function SimpleAdminDashboard() {
         const categoriesRes = await fetch("/api/categories")
         if (categoriesRes.ok) {
           const categoriesData = await categoriesRes.json()
+          console.log("[v0] Loaded categories:", categoriesData) // Added debugging
           setCategories(Array.isArray(categoriesData) ? categoriesData : [])
         }
       } catch (error) {
@@ -152,6 +154,7 @@ export function SimpleAdminDashboard() {
         const brandsRes = await fetch("/api/brands")
         if (brandsRes.ok) {
           const brandsData = await brandsRes.json()
+          console.log("[v0] Loaded brands:", brandsData) // Added debugging
           setBrands(Array.isArray(brandsData) ? brandsData : [])
         }
       } catch (error) {
@@ -332,6 +335,11 @@ export function SimpleAdminDashboard() {
     try {
       console.log("[v0] Creating product with data:", productForm)
 
+      if (!productForm.sku.trim()) {
+        alert("SKU is required")
+        return
+      }
+
       const response = await fetch("/api/admin/products", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -352,6 +360,7 @@ export function SimpleAdminDashboard() {
           name: "",
           description: "",
           price: "",
+          sku: "", // Reset SKU field
           brand_id: "",
           category_id: "",
           is_featured: false,
@@ -688,6 +697,16 @@ export function SimpleAdminDashboard() {
                             />
                           </div>
                           <div>
+                            <Label htmlFor="sku">SKU (Stock Keeping Unit)</Label>
+                            <Input
+                              id="sku"
+                              value={productForm.sku}
+                              onChange={(e) => setProductForm({ ...productForm, sku: e.target.value })}
+                              className="bg-gray-800 border-gray-700"
+                              placeholder="e.g., RLX-SUB-001"
+                            />
+                          </div>
+                          <div>
                             <Label htmlFor="description">Description</Label>
                             <Textarea
                               id="description"
@@ -816,6 +835,7 @@ export function SimpleAdminDashboard() {
                                       product.product_images?.[0]?.url ||
                                       product.images?.[0] ||
                                       product.image_url ||
+                                      "/placeholder.svg" ||
                                       "/placeholder.svg" ||
                                       "/placeholder.svg" ||
                                       "/placeholder.svg" ||
@@ -1015,6 +1035,7 @@ export function SimpleAdminDashboard() {
                     </Dialog>
                   </CardHeader>
                   <CardContent>
+                    {console.log("[v0] Rendering brands section, brands.length:", brands.length)}
                     {brands.length === 0 ? (
                       <p className="text-gray-400 text-center py-8">
                         No brands found. Add your first brand to get started.
@@ -1125,6 +1146,7 @@ export function SimpleAdminDashboard() {
                     </Dialog>
                   </CardHeader>
                   <CardContent>
+                    {console.log("[v0] Rendering categories section, categories.length:", categories.length)}
                     {categories.length === 0 ? (
                       <p className="text-gray-400 text-center py-8">
                         No categories found. Add your first category to get started.
