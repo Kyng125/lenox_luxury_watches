@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -73,6 +73,55 @@ export function SimpleAdminDashboard() {
     images: [],
   })
 
+  const loadData = useCallback(async () => {
+    try {
+      console.log("[v0] Loading dashboard data...")
+
+      const [productsRes, ordersRes, brandsRes, categoriesRes] = await Promise.all([
+        fetch("/api/admin/products"),
+        fetch("/api/orders"),
+        fetch("/api/brands"),
+        fetch("/api/categories"),
+      ])
+
+      console.log("[v0] API responses:", {
+        products: productsRes.status,
+        orders: ordersRes.status,
+        brands: brandsRes.status,
+        categories: categoriesRes.status,
+      })
+
+      if (productsRes.ok) {
+        const productsData = await productsRes.json()
+        console.log("[v0] Products loaded:", productsData.length)
+        setProducts(productsData)
+        setFeaturedProducts(productsData.filter((product) => product.is_featured))
+      }
+
+      if (ordersRes.ok) {
+        const ordersData = await ordersRes.json()
+        console.log("[v0] Orders loaded:", ordersData.length)
+        setOrders(ordersData)
+      }
+
+      if (brandsRes.ok) {
+        const brandsData = await brandsRes.json()
+        console.log("[v0] Brands loaded:", brandsData.length)
+        setBrands(brandsData)
+      }
+
+      if (categoriesRes.ok) {
+        const categoriesData = await categoriesRes.json()
+        console.log("[v0] Categories loaded:", categoriesData.length)
+        setCategories(categoriesData)
+      }
+
+      console.log("[v0] Dashboard data loading complete")
+    } catch (error) {
+      console.error("[v0] Error loading dashboard data:", error)
+    }
+  }, []) // Empty dependency array to prevent recreation
+
   useEffect(() => {
     // Check if already authenticated
     const auth = localStorage.getItem("dashboard-auth")
@@ -80,7 +129,7 @@ export function SimpleAdminDashboard() {
       setIsAuthenticated(true)
       loadData()
     }
-  }, [])
+  }, [loadData]) // Add loadData to dependency array since it's now memoized
 
   const handleLogin = () => {
     if (password === "lenox2024") {
@@ -479,54 +528,6 @@ export function SimpleAdminDashboard() {
     ? products.filter((product) => (product.stock_quantity || 0) < 5).length
     : 0
 
-  const loadData = async () => {
-    try {
-      console.log("[v0] Loading dashboard data...")
-
-      const [productsRes, ordersRes, brandsRes, categoriesRes] = await Promise.all([
-        fetch("/api/admin/products"),
-        fetch("/api/orders"),
-        fetch("/api/brands"),
-        fetch("/api/categories"),
-      ])
-
-      console.log("[v0] API responses:", {
-        products: productsRes.status,
-        orders: ordersRes.status,
-        brands: brandsRes.status,
-        categories: categoriesRes.status,
-      })
-
-      if (productsRes.ok) {
-        const productsData = await productsRes.json()
-        console.log("[v0] Products loaded:", productsData.length)
-        setProducts(productsData)
-      }
-
-      if (ordersRes.ok) {
-        const ordersData = await ordersRes.json()
-        console.log("[v0] Orders loaded:", ordersData.length)
-        setOrders(ordersData)
-      }
-
-      if (brandsRes.ok) {
-        const brandsData = await brandsRes.json()
-        console.log("[v0] Brands loaded:", brandsData.length)
-        setBrands(brandsData)
-      }
-
-      if (categoriesRes.ok) {
-        const categoriesData = await categoriesRes.json()
-        console.log("[v0] Categories loaded:", categoriesData.length)
-        setCategories(categoriesData)
-      }
-
-      console.log("[v0] Dashboard data loading complete")
-    } catch (error) {
-      console.error("[v0] Error loading dashboard data:", error)
-    }
-  }
-
   return (
     <div className="min-h-screen bg-black text-white">
       <div className="border-b border-gray-800 bg-gray-900">
@@ -863,6 +864,7 @@ export function SimpleAdminDashboard() {
                                       product.product_images?.[0]?.url ||
                                       product.images?.[0] ||
                                       product.image_url ||
+                                      "/placeholder.svg" ||
                                       "/placeholder.svg" ||
                                       "/placeholder.svg" ||
                                       "/placeholder.svg" ||
